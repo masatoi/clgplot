@@ -1,7 +1,17 @@
 * Clgplot 
 
 ** Usage
+see example.lisp
 
 ** Dependencies
+external-program
 
 ** Installation
+#+BEGIN_SRC sh
+cd ~/quicklisp/local-projects
+git clone https://github.com/masatoi/clgplot.git
+#+END_SRC
+
+#+BEGIN_SRC lisp
+(ql:quickload :clgplot)
+#+END_SRC

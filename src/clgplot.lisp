@@ -6,8 +6,7 @@
   (:nicknames :clgp)
   (:export :plot-list :plot-lists
            :plot-histogram :plot-histogram-with-pdf
-           :splot-list :splot-matrix
-   ))
+           :splot-list :splot-matrix))
 
 (in-package :clgplot)
 
@@ -27,6 +26,9 @@
   `(labels ((,tag ,(mapcar #'car var-vals) ,@body))
      (declare (optimize (speed 3))) ; for tail recursion optimization
      (,tag ,@(mapcar #'cadr var-vals))))
+
+(defun last1 (lst)
+  (car (last lst)))
 
 ;;; 
 (defun dump-gp-file (plot-arg-format

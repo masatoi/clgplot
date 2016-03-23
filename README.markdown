@@ -1,5 +1,0 @@
-# Clgplot
-
-## Usage
-
-## Installation

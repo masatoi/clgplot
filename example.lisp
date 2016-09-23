@@ -63,7 +63,7 @@
                  :x-label "x"
                  :y-label "f(x)"
                  ;; :PDF :EPS :EPS-MONOCHROME :PNG :PNG-1280X1024 :PNG-2560X1024 :PNG-MONOCHROME
-                 :output-format :eps
+                 :output-format :eps-monochrome
                  :output "/home/wiz/tmp/clgp-output.eps")
 
 ;; 08 splot
@@ -101,3 +101,18 @@
 (clgp:plot-histogram (loop repeat 100000 collect (random-normal)) ; samples
                      100 ; number of bin
                      )
+;; スタイル
+
+(defparameter *x-list2*
+  '(-3.14 -2.64 -2.14 -1.64 -1.14 -0.64 -0.14 0.358 0.858 1.358 1.858 2.358 2.858 3.14))
+
+(clgp:plot-list (mapcar #'sin *x-list2*) :style 'line)
+(clgp:plot-list (mapcar #'sin *x-list2*) :style 'points)
+(clgp:plot-list (mapcar #'sin *x-list2*) :style 'impulse)
+
+(let* ((rand-x-list (loop repeat 100 collect (- (random (* 2 pi)) pi)))
+       (rand-y-list (mapcar (lambda (x) (+ (sin x) (random-normal :sd 0.2d0))) rand-x-list)))
+  (clgp:plot-lists (list (mapcar #'sin *x-list*)
+                         rand-y-list)
+                   :x-lists (list *x-list* rand-x-list)
+                   :style '(line point)))

@@ -575,9 +575,6 @@
 		   (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
 		   (key t)
 		   (map nil))
-  ;; 長さチェック
-  (if (not (= (length x-list) (length y-list)))
-    (error "list length mismatch detected between y-list and x-list."))
   
   ;; datファイルに出力
   (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
@@ -629,7 +626,7 @@
     (splot-list (lambda (x y)
 		  (aref matrix (truncate x) (truncate y)))
 		(seq-row 0 (1- (array-dimension matrix 0)))
-		(seq-col 0 (1- (array-dimension matrix 0)))	      
+		(seq-col 0 (1- (array-dimension matrix 1)))
 		:title title :style style
 		:x-label x-label :y-label y-label :z-label z-label
 		:output output :output-format output-format

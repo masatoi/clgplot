@@ -12,7 +12,7 @@ git clone https://github.com/masatoi/clgplot.git
 
 In case of using Roswell, simply
 #+BEGIN_SRC sh
-ros install /masatoi/clgplot
+ros install masatoi/clgplot
 #+END_SRC
 
 #+BEGIN_SRC lisp

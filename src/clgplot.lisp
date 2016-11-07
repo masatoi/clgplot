@@ -4,9 +4,10 @@
 (defpackage :clgplot
   (:use :cl)
   (:nicknames :clgp)
-  (:export :plot-list :plot-lists
+  (:export :*gnuplot-path* :*tmp-dat-file* :*tmp-gp-file*
+           :plot-list :plot :plot-lists :plots
            :plot-histogram :plot-histogram-with-pdf
-           :splot-list :splot-matrix))
+           :splot-list :splot :splot-matrix))
 
 (in-package :clgplot)
 
@@ -16,8 +17,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defparameter *gnuplot-path* "gnuplot")
-(defparameter *tmp-dat-file* "/tmp/gnuplot-tmp.dat")
-(defparameter *tmp-gp-file* "/tmp/gnuplot-tmp.gp")
+(defparameter *tmp-dat-file* "/tmp/clgplot-tmp.dat")
+(defparameter *tmp-gp-file* "/tmp/clgplot-tmp.gp")
 
 ;;; Utilities
 
@@ -30,70 +31,15 @@
 (defun last1 (lst)
   (car (last lst)))
 
-;;; 
-(defun dump-gp-file (plot-arg-format
-		     &key (x-label nil) (y-label nil)
-		     (aspect-ratio 1.0)
-		     (output nil) (output-format :png)
-		     (x-logscale nil) (y-logscale nil)
-		     (x-range nil) (y-range nil)
-		     (x-range-reverse nil) (y-range-reverse nil) (key t))
-  (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
-    ;; 図の設定
-    ;; 画像出力する場合の設定
-    (cond (output
-	   (ecase output-format
-	     (:pdf (format gp-file "set term pdf~%"))
-	     (:eps (format gp-file "set term postscript eps enhanced color~%"))
-	     (:eps-monochrome (format gp-file "set term postscript eps enhanced monochrome~%"))
-	     (:png (format gp-file "set term png~%"))
-	     (:png-1280x1024 (format gp-file "set term png size 1280,1024~%"))
-	     (:png-2560x1024 (format gp-file "set term png size 2560,1024~%"))
-	     (:png-monochrome (format gp-file "set term png monochrome~%")))
-	   (format gp-file "set output \"~A\"~%" output))
-	  (t (format gp-file "set term x11~%")))
-    
-    ;; 軸のラベル
-    (if x-label (format gp-file "set xlabel \"~A\"~%" x-label))
-    (if y-label (format gp-file "set ylabel \"~A\"~%" y-label))
-    
-    ;; 範囲指定、軸の向きの指定
-    (if x-range
-	(format gp-file "set xrange [~f:~f] " (car x-range) (cadr x-range))
-	(format gp-file "set xrange [] "))
-    (if x-range-reverse
-	(format gp-file "reverse"))
-    (format gp-file "~%")
-    
-    (if y-range
-	(format gp-file "set yrange [~f:~f] " (car y-range) (cadr y-range))
-	(format gp-file "set yrange [] "))
-    (if y-range-reverse
-	(format gp-file "reverse"))
-    (format gp-file "~%")
-    
-    ;; 対数スケール
-    (if x-logscale (format gp-file "set logscale x~%"))
-    (if y-logscale (format gp-file "set logscale y~%"))
-    
-    ;; アスペクト比
-    (if aspect-ratio (format gp-file "set size ratio ~f~%" aspect-ratio))
-
-    ;; 凡例の位置、あるいは出すかどうか
-    key
-    
-    ;; プロット用コマンド
-    (format gp-file (concatenate 'string "plot " plot-arg-format))))
-
+;;;
 (defun dump-gp-stream (stream plot-arg-format
 		       &key (x-label nil) (y-label nil)
-		       (aspect-ratio 1.0)
-		       (output nil) (output-format :png)
-		       (x-logscale nil) (y-logscale nil)
-		       (x-range nil) (y-range nil)
-		       (x-range-reverse nil) (y-range-reverse nil) (key t))
-  ;; 図の設定
-  ;; 画像出力する場合の設定
+                         (aspect-ratio 1.0)
+                         (output nil) (output-format :png)
+                         (x-logscale nil) (y-logscale nil)
+                         (x-range nil) (y-range nil)
+                         (x-range-reverse nil) (y-range-reverse nil) (key t))
+  ;; Setting for Output to file
   (cond (output
 	 (ecase output-format
 	   (:pdf (format stream "set term pdf~%"))
@@ -105,38 +51,47 @@
 	   (:png-monochrome (format stream "set term png monochrome~%")))
 	 (format stream "set output \"~A\"~%" output))
 	(t (format stream "set term x11~%")))
-  
-  ;; 軸のラベル
+  ;; Axis label
   (if x-label (format stream "set xlabel \"~A\"~%" x-label))
   (if y-label (format stream "set ylabel \"~A\"~%" y-label))
-  
-  ;; 範囲指定、軸の向きの指定
+  ;; Input range, Increase direction of X
   (if x-range
-      (format stream "set xrange [~f:~f] " (car x-range) (cadr x-range))
-      (format stream "set xrange [] "))
+    (format stream "set xrange [~f:~f] " (car x-range) (cadr x-range))
+    (format stream "set xrange [] "))
   (if x-range-reverse
-      (format stream "reverse"))
+    (format stream "reverse"))
   (format stream "~%")
-  
   (if y-range
-      (format stream "set yrange [~f:~f] " (car y-range) (cadr y-range))
-      (format stream "set yrange [] "))
+    (format stream "set yrange [~f:~f] " (car y-range) (cadr y-range))
+    (format stream "set yrange [] "))
   (if y-range-reverse
-      (format stream "reverse"))
+    (format stream "reverse"))
   (format stream "~%")
-  
-  ;; 対数スケール
+  ;; Use of logscale
   (if x-logscale (format stream "set logscale x~%"))
   (if y-logscale (format stream "set logscale y~%"))
-  
-  ;; アスペクト比
+  ;; Aspect ratio
   (if aspect-ratio (format stream "set size ratio ~f~%" aspect-ratio))
-
-  ;; 凡例の位置、あるいは出すかどうか
+  ;; Graph legend enable/disable, or its position
   key
   
-  ;; プロット用コマンド
   (format stream (concatenate 'string "plot " plot-arg-format)))
+
+(defun dump-gp-file (plot-arg-format
+		     &key (x-label nil) (y-label nil)
+                       (aspect-ratio 1.0)
+                       (output nil) (output-format :png)
+                       (x-logscale nil) (y-logscale nil)
+                       (x-range nil) (y-range nil)
+                       (x-range-reverse nil) (y-range-reverse nil) (key t))
+  (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
+    (dump-gp-stream gp-file plot-arg-format
+                    :x-label x-label :y-label y-label
+                    :aspect-ratio aspect-ratio
+                    :output output :output-format output-format
+                    :x-logscale x-logscale :y-logscale y-logscale
+                    :x-range x-range :y-range y-range
+                    :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :key key)))
 
 (defun plot-list (y-list
 		  &key (x-list nil) (title " ") (style 'lines)
@@ -148,10 +103,9 @@
 		    (x-range-reverse nil) (y-range-reverse nil) (key t)
 		    (stream nil))
   (if (null x-list) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
-  ;; 長さチェック
   (if (not (= (length x-list) (length y-list)))
     (error "list length mismatch detected between y-list and x-list."))
-  ;; datファイルに出力
+  ;; Output to DAT file
   (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
     (mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))
 
@@ -168,7 +122,7 @@
 			:x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
 			:key key)
 	(finish-output stream))
-      ;; gpファイルに出力
+      ;; Output to GP file
       (progn
 	(dump-gp-file plot-arg-string
 		      :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
@@ -177,41 +131,55 @@
 		      :x-range x-range :y-range y-range
 		      :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
 		      :key key)      
-	;; gnuplotを呼び出し
-	(external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))))
+	;; Call Gnuplot
+        (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))))
+
+(defun plot (y-seq
+             &key (x-seq nil) (title " ") (style 'lines)
+               (x-label nil) (y-label nil)
+               (aspect-ratio 1.0)
+               (output nil) (output-format :png)
+               (x-logscale nil) (y-logscale nil)
+               (x-range nil) (y-range nil)
+               (x-range-reverse nil) (y-range-reverse nil) (key t)
+               (stream nil))
+  (plot-list (coerce y-seq 'list)
+             :x-list (coerce x-seq 'list)
+             :title title
+             :style style
+             :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
+             :output output :output-format output-format
+             :x-logscale x-logscale :y-logscale y-logscale
+             :x-range x-range :y-range y-range
+             :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
+             :key key :stream stream))
 
 (defun comma-separated-concatenate (string-list)
-  (apply #'concatenate 'string
-	 (nlet iter ((string-list string-list)
-		     (product nil))
-	   (if (null (cdr string-list))
-	       (nreverse (cons (car string-list) product))
-	       (iter (cdr string-list) (cons "," (cons (car string-list) product)))))))
+  (reduce (lambda (s1 s2) (concatenate 'string s1 "," s2))
+          string-list))
 
 ;; 2つの軸を使いたいときは、
 ;; (plot-lists (list list1 list2) :axis-list '(x1y1 x1y2))
 ;; のようにする。それ以上の数、スケールの異なるグラフを重ねて表示する場合は、次で定義する正規化機能付きのplot-lists-with-normalizeで表示する
 ;; というか、y-listsに何か関数を噛ませればいいのか。normalize-listを定義したので、これをmapcarすればいい。
 
-;; 線ごとにスタイルを変えたいときのために、styleにlistを指定することもできるようにする
 (defun plot-lists (y-lists
-		   &key (x-lists nil) (title-list nil) (style 'lines)
+		   &key (x-lists nil) (title-list nil) (style 'lines) ; style also accepts list of symbols
 		     (x-label nil) (y-label nil)
 		     (aspect-ratio 1.0)
 		     (output nil) (output-format :png)
 		     (x-logscale nil) (y-logscale nil)
 		     (x-range nil) (y-range nil)
 		     (x-range-reverse nil) (y-range-reverse nil) (key t)
-		     (axis-list nil) ; nilにすると全部x1y1にする
+		     (axis-list nil) ; When axis-list is nil, use x1y1 axis for all plots
 		     (stream nil))
   (loop for i from 0 to (1- (length y-lists)) do
     (let ((x-list (nth i x-lists))
 	  (y-list (nth i y-lists)))
       (if (null x-lists) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
-      ;; 長さチェック
       (if (not (= (length x-list) (length y-list)))
 	(error "list length mismatch detected between y-list and x-list."))
-      ;; datファイルに出力
+      ;; Output to DAT file
       (with-open-file (dat-file (format nil "~A.~A" *tmp-dat-file* i)
 				:direction :output :if-exists :supersede)
 	(mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))))
@@ -223,15 +191,18 @@
   (if (and (listp style) (not (= (length y-lists) (length style))))
     (error "list length mismatch detected between y-lists and style."))
   
-  ;; gpファイルに出力
-  (let ((plot-arg-string (comma-separated-concatenate
-			  (loop for i from 0 to (1- (length y-lists)) collect
-			    (format nil "\"~A.~A\" using 1:2 with ~A title \"~A\" axis ~A"
-				    *tmp-dat-file* i (if (symbolp style)
-						       (string-downcase (symbol-name style))
-						       (string-downcase (symbol-name (nth i style))))
-						     (if (null title-list) " " (nth i title-list))
-						     (if (null axis-list) "x1y1" (string-downcase (symbol-name (nth i axis-list)))))))))
+  ;; Output to GP file
+  (let ((plot-arg-string
+         (comma-separated-concatenate
+          (loop for i from 0 to (1- (length y-lists)) collect
+            (format nil "\"~A.~A\" using 1:2 with ~A title \"~A\" axis ~A"
+                    *tmp-dat-file*
+                    i
+                    (if (symbolp style)
+                      (string-downcase (symbol-name style))
+                      (string-downcase (symbol-name (nth i style))))
+                    (if (null title-list) " " (nth i title-list))
+                    (if (null axis-list) "x1y1" (string-downcase (symbol-name (nth i axis-list)))))))))
     (if stream
       (progn (dump-gp-stream stream
 			     plot-arg-string
@@ -249,28 +220,50 @@
 			   :x-range x-range :y-range y-range
 			   :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
 			   :key key)
-	     ;; gnuplotを呼び出し
+             ;; Call Gnuplot
 	     (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))))
 
-;;; listを[0,1]の範囲に正規化する
-(defun normalize-list (list)
-  (let ((max-elem (general-max/min #'> list))
-	(min-elem (general-max/min #'< list)))
-    (if (> min-elem 0)
-	(mapcar (lambda (elem)
-		  (/ (- elem min-elem)
-		     (abs (- max-elem min-elem))))
-		list)
-	(mapcar (lambda (elem)
-		  (/ (+ elem min-elem)
-		     (abs (- max-elem min-elem))))
-		list))))
+(defun plots (y-seqs
+              &key (x-seqs nil) (title-list nil) (style 'lines) ; style also accepts list of symbols
+                (x-label nil) (y-label nil)
+                (aspect-ratio 1.0)
+                (output nil) (output-format :png)
+                (x-logscale nil) (y-logscale nil)
+                (x-range nil) (y-range nil)
+                (x-range-reverse nil) (y-range-reverse nil) (key t)
+                (axis-list nil) ; When axis-list is nil, use x1y1 axis for all plots
+                (stream nil))
+  (plot-lists (map 'list (lambda (seq) (coerce seq 'list)) y-seqs)
+              :x-lists (map 'list (lambda (seq) (coerce seq 'list)) x-seqs)
+              :title-list title-list :style style
+              :x-label x-label :y-label y-label
+              :aspect-ratio aspect-ratio
+              :output output :output-format output-format
+              :x-logscale x-logscale :y-logscale y-logscale
+              :x-range x-range :y-range y-range
+              :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :key key
+              :axis-list axis-list
+              :stream stream))
+
+;; ;;; listを[0,1]の範囲に正規化する
+;; (defun normalize-list (list)
+;;   (let ((max-elem (loop for x in list maximize x))
+;; 	(min-elem (loop for x in list minimize x)))
+;;     (if (> min-elem 0)
+;; 	(mapcar (lambda (elem)
+;; 		  (/ (- elem min-elem)
+;; 		     (abs (- max-elem min-elem))))
+;; 		list)
+;; 	(mapcar (lambda (elem)
+;; 		  (/ (+ elem min-elem)
+;; 		     (abs (- max-elem min-elem))))
+;; 		list))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; histogram ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; 区間(a,b)をn分割したとき,xがどの区間に入るかを返す
+;; Separate interval (a,b) equally to n bins, then return index of the bin which x belongs to.
 (defun histogram-lem1 (x a b n)
   (if (or (< x a) (< b x))
       nil
@@ -316,8 +309,9 @@
       )))
 
 (defun pdf-normal (x &key (mu 0) (sd 1))
-  (/ (exp (- (/ (square (/ (- x mu) sd)) 2)))
-     (* (sqrt (* 2 pi)) sd)))
+  (flet ((square (x) (* x x)))
+    (/ (exp (- (/ (square (/ (- x mu) sd)) 2)))
+       (* (sqrt (* 2 pi)) sd))))
 
 (defun plot-histogram-with-pdf (samples n-of-bin pdf &key (output nil)
 				(x-range nil) (y-range nil)
@@ -492,13 +486,14 @@
 (defun dump-gp-file-3d
     (plot-arg-format
      &key
-     (x-label nil) (y-label nil) (z-label nil)
-     (aspect-ratio 1.0)
-     (output nil) (output-format :png)
-     (x-logscale nil) (y-logscale nil) (z-logscale nil)
-     (x-range nil) (y-range nil) (z-range nil)
-     (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
-     (key t) (map nil))
+       (x-label nil) (y-label nil) (z-label nil)
+       (aspect-ratio 1.0)
+       (output nil) (output-format :png)
+       (x-logscale nil) (y-logscale nil) (z-logscale nil)
+       (x-range nil) (y-range nil) (z-range nil)
+       (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
+       (view-point '(60 30)) (magnification 1) (z-scale 1)
+       (key t) (map nil))
   (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
     ;; 図の設定
     ;; 画像出力する場合の設定
@@ -549,9 +544,14 @@
     ;; アスペクト比
     (if aspect-ratio (format gp-file "set size ratio ~f~%" aspect-ratio))
 
+    ;; 視点指定
+    (format gp-file "set view ~A, ~A, ~A, ~A~%"
+            (car view-point) (cadr view-point) magnification z-scale)
+    
     ;; 凡例の位置、あるいは出すかどうか
     key
 
+    ;; カラースキーム指定
     (format gp-file "set palette rgbformulae 22,13,-31~%")
 
     (if map
@@ -567,16 +567,16 @@
 
 (defun splot-list (z-func x-list y-list
 		   &key (title " ") (style 'lines)
-		   (x-label nil) (y-label nil) (z-label nil)
-		   (aspect-ratio 1.0)
-		   (output nil) (output-format :png)
-		   (x-logscale nil) (y-logscale nil) (z-logscale nil)
-		   (x-range nil) (y-range nil) (z-range nil)
-		   (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
-		   (key t)
-		   (map nil))
-  
-  ;; datファイルに出力
+                     (x-label nil) (y-label nil) (z-label nil)
+                     (aspect-ratio 1.0)
+                     (output nil) (output-format :png)
+                     (x-logscale nil) (y-logscale nil) (z-logscale nil)
+                     (x-range nil) (y-range nil) (z-range nil)
+                     (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
+                     (view-point '(60 30)) (magnification 1) (z-scale 1)
+                     (key t)
+                     (map nil))  
+  ;; Output to DAT file
   (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
       (mapc #'(lambda (x)
 		(mapc #'(lambda (y)
@@ -584,8 +584,7 @@
 		      y-list)
 		(format dat-file "~%")) ; xの値が変わるごとに改行を入れることでグリッドデータとして認識される
 	    x-list))
-    
-  ;; gpファイルに出力
+  ;; Output to DAT file
   (dump-gp-file-3d
    (if map
        (format nil "\"~A\" using 1:2:3 title \"~A\""
@@ -604,9 +603,32 @@
 		y-range)
    :z-range z-range
    :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :z-range-reverse z-range-reverse
+   :view-point view-point :magnification magnification :z-scale z-scale
    :key key :map map)
-  ;; gnuplotを呼び出し
   (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*)))
+
+(defun splot (z-func x-seq y-seq
+              &key (title " ") (style 'lines)
+                (x-label nil) (y-label nil) (z-label nil)
+                (aspect-ratio 1.0)
+                (output nil) (output-format :png)
+                (x-logscale nil) (y-logscale nil) (z-logscale nil)
+                (x-range nil) (y-range nil) (z-range nil)
+                (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
+                (view-point '(60 30)) (magnification 1) (z-scale 1)
+                (key t)
+                (map nil))
+  (splot-list z-func (coerce x-seq 'list) (coerce y-seq 'list)
+              :title title :style style
+              :x-label x-label :y-label y-label :z-label z-label
+              :aspect-ratio aspect-ratio
+              :output output :output-format output-format
+              :x-logscale x-logscale :y-logscale y-logscale :z-logscale z-logscale
+              :x-range x-range :y-range y-range :z-range z-range
+              :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :z-range-reverse z-range-reverse
+              :view-point view-point :magnification magnification :z-scale z-scale
+              :key key
+              :map map))
 
 (defun splot-matrix (matrix &key (title " ") (style 'lines)
 			      (x-label nil) (y-label nil) (z-label nil)

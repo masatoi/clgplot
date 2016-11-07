@@ -81,8 +81,8 @@
 
 ;; splot map
 (clgp:splot (lambda (x y) (+ (sin x) (cos y)))
-  *x-list* ; x-list
-  *x-list* ; y-list
+  *x-list* ; x
+  *x-list* ; y
   :map t)
 
 ;; splot-matrix

@@ -1,10 +1,8 @@
-* Clgplot 
-
-** Usage
-see example.lisp
+* clgplot 
+clgplot is a Gnuplot4 front-end on Common Lisp.
 
 ** Dependencies
-external-program
+Gnuplot4
 
 ** Installation
 #+BEGIN_SRC sh
@@ -12,6 +10,69 @@ cd ~/quicklisp/local-projects
 git clone https://github.com/masatoi/clgplot.git
 #+END_SRC
 
+In case of using Roswell, simply
+#+BEGIN_SRC sh
+ros install /masatoi/clgplot
+#+END_SRC
+
 #+BEGIN_SRC lisp
 (ql:quickload :clgplot)
 #+END_SRC
+
+** Usage
+clgplot generates a data file and a setting file of Gnuplot to tmp directory and execute Gnuplot with -persist option.
+Paths to these files or command can be changed as below.
+#+BEGIN_SRC lisp
+(defparameter clgp:*gnuplot-path* "gnuplot")
+(defparameter clgp:*tmp-dat-file* "/tmp/clgplot-tmp.dat")
+(defparameter clgp:*tmp-gp-file* "/tmp/clgplot-tmp.gp")
+#+END_SRC
+
+Plot of single function
+#+BEGIN_SRC lisp
+(defparameter *x-list* (loop for i from (- pi) to pi by 0.1 collect i))
+
+(clgp:plot (mapcar #'sin *x-list*))
+#+END_SRC
+
+[[./docs/img/clgp02.png]]
+
+Plot of multiple functions with annotations
+#+BEGIN_SRC lisp
+(clgp:plots (list (mapcar #'sin *x-list*)
+                  (mapcar #'cos *x-list*)
+                  (mapcar #'tan *x-list*))
+            :x-seqs  (list *x-list* *x-list* *x-list*)
+            :x-range (list (- pi) pi)
+            :y-range '(-1 1)
+            :title-list '("sin" "cos" "tan")
+            :x-label "x"
+            :y-label "f(x)")
+#+END_SRC
+
+[[./docs/img/clgp-output2.png]]
+
+3D plot examples
+#+BEGIN_SRC lisp
+(clgp:splot (lambda (x y) (+ (sin x) (cos y)))
+  *x-list* ; x
+  *x-list* ; y
+  :view-point '(20 45) :z-scale 1.5)
+#+END_SRC
+
+[[./docs/img/clgp-splot1.png]]
+
+#+BEGIN_SRC lisp
+(clgp:splot (lambda (x y) (+ (sin x) (cos y)))
+  *x-list* ; x
+  *x-list* ; y
+  :map t)
+#+END_SRC
+
+[[./docs/img/clgp09.png]]
+
+** Author
+Satoshi Imai (satoshi.imai@gmail.com)
+
+** License
+The MIT license

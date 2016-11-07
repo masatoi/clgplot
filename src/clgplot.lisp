@@ -5,6 +5,7 @@
   (:use :cl)
   (:nicknames :clgp)
   (:export :*gnuplot-path* :*tmp-dat-file* :*tmp-gp-file*
+           :seq
            :plot-list :plot :plot-lists :plots
            :plot-histogram :plot-histogram-with-pdf
            :splot-list :splot :splot-matrix))
@@ -30,6 +31,9 @@
 
 (defun last1 (lst)
   (car (last lst)))
+
+(defun seq (start end &optional (by 1))
+  (loop for x from start to end by by collect x))
 
 ;;;
 (defun dump-gp-stream (stream plot-arg-format

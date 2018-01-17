@@ -499,6 +499,7 @@
        (x-range nil) (y-range nil) (z-range nil)
        (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
        (view-point '(60 30)) (magnification 1) (z-scale 1)
+       (palette 'jet)
        (key t) (map nil))
   (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
     ;; 図の設定
@@ -558,9 +559,12 @@
     
     ;; 凡例の位置、あるいは出すかどうか
     key
-
+    
     ;; カラースキーム指定
-    (format gp-file "set palette rgbformulae 22,13,-31~%")
+    (ecase palette
+      (:greys (format gp-file "set palette defined ( 0 0 0 0, 1 1 1 1 )~%"))
+      (:greys-invert (format gp-file "set palette defined ( 1 1 1 1, 0 0 0 0 )~%"))
+      (:jet (format gp-file "set palette defined ( 0 '#000090',1 '#000fff',2 '#0090ff',3 '#0fffee',4 '#90ff70',5 '#ffee00',6 '#ff7000',7 '#ee0000',8 '#7f0000')~%")))
 
     (if map
 	(progn
@@ -582,8 +586,7 @@
                      (x-range nil) (y-range nil) (z-range nil)
                      (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
                      (view-point '(60 30)) (magnification 1) (z-scale 1)
-                     (key t)
-                     (map nil))  
+                     (palette :jet) (key t) (map nil))
   ;; Output to DAT file
   (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
       (mapc #'(lambda (x)
@@ -612,7 +615,7 @@
    :z-range z-range
    :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :z-range-reverse z-range-reverse
    :view-point view-point :magnification magnification :z-scale z-scale
-   :key key :map map)
+   :palette palette :key key :map map)
   (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*)))
 
 (defun splot (z-func x-seq y-seq
@@ -624,8 +627,7 @@
                 (x-range nil) (y-range nil) (z-range nil)
                 (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
                 (view-point '(60 30)) (magnification 1) (z-scale 1)
-                (key t)
-                (map nil))
+                (palette :jet) (key t) (map nil))
   (splot-list z-func (coerce x-seq 'list) (coerce y-seq 'list)
               :title title :style style
               :x-label x-label :y-label y-label :z-label z-label
@@ -635,14 +637,13 @@
               :x-range x-range :y-range y-range :z-range z-range
               :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :z-range-reverse z-range-reverse
               :view-point view-point :magnification magnification :z-scale z-scale
-              :key key
-              :map map))
+              :palette palette :key key :map map))
 
 (defun splot-matrix (matrix &key (title " ") (style 'lines)
 			      (x-label nil) (y-label nil) (z-label nil)
 			      (output nil) (output-format :png)
 			      (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
-			      (key t))
+			      (palette :jet) (key t))
   (flet ((seq-row (start end)
 	   (nlet iter ((i start) (product nil))
 	     (if (> i end)
@@ -661,4 +662,4 @@
 		:x-label x-label :y-label y-label :z-label z-label
 		:output output :output-format output-format
 		:x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :z-range-reverse z-range-reverse
-		:aspect-ratio 1.0 :map t :key key)))
+		:aspect-ratio 1.0 :palette palette :map t :key key)))

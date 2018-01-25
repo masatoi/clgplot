@@ -4,7 +4,7 @@
 (defpackage :clgplot
   (:use :cl)
   (:nicknames :clgp)
-  (:export :*gnuplot-path* :*tmp-dat-file* :*tmp-gp-file*
+  (:export :*gnuplot-path* :*tmp-dat-file* :*tmp-gp-file* :*default-terminal*
            :seq
            :plot-list :plot :plot-lists :plots
            :plot-histogram :plot-histogram-with-pdf
@@ -20,6 +20,9 @@
 (defparameter *gnuplot-path* "gnuplot")
 (defparameter *tmp-dat-file* "/tmp/clgplot-tmp.dat")
 (defparameter *tmp-gp-file* "/tmp/clgplot-tmp.gp")
+(defparameter *default-terminal*
+  #-windows "x11"
+  #+windows "windows")
 
 ;;; Utilities
 
@@ -56,7 +59,7 @@
 	   (:png-2560x1024 (format stream "set term png size 2560,1024~%"))
 	   (:png-monochrome (format stream "set term png monochrome~%")))
 	 (format stream "set output \"~A\"~%" output))
-	(t (format stream "set term x11~%")))
+	(t (format stream "set term ~A~%" *default-terminal*)))
   ;; Axis label
   (if x-label (format stream "set xlabel \"~A\"~%" x-label))
   (if y-label (format stream "set ylabel \"~A\"~%" y-label))
@@ -516,7 +519,7 @@
 	     (:png-2560x1024 (format gp-file "set term png size 2560,1024~%"))
 	     (:png-monochrome (format gp-file "set term png monochrome~%")))
 	   (format gp-file "set output \"~A\"~%" output))
-	  (t (format gp-file "set term x11~%")))
+	  (t (format gp-file "set term ~A~%" *default-terminal*)))
     
     ;; 軸のラベル
     (if x-label (format gp-file "set xlabel \"~A\"~%" x-label))

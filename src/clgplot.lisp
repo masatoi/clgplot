@@ -2,11 +2,11 @@
 
 (in-package :cl-user)
 (defpackage :clgplot
-  (:use :cl)
+  (:use :cl :iter)
   (:nicknames :clgp)
   (:export :*gnuplot-path* :*tmp-dat-file* :*tmp-gp-file* :*default-terminal*
            :seq
-           :plot-list :plot :plot-lists :plots
+           :plot :plots
            :plot-histogram :plot-histogram-with-pdf
            :splot-list :splot :splot-matrix))
 
@@ -41,6 +41,7 @@
 ;;;
 (defun dump-gp-stream (stream plot-arg-format
 		       &key (x-label nil) (y-label nil)
+			 (main nil)
                          (aspect-ratio 1.0)
                          (output nil) (output-format :png)
                          (x-logscale nil) (y-logscale nil)
@@ -60,6 +61,8 @@
 	   (:png-monochrome (format stream "set term png monochrome~%")))
 	 (format stream "set output \"~A\"~%" output))
 	(t (format stream "set term ~A~%" *default-terminal*)))
+  ;; Main title
+  (when main (format stream "set title \"~A\"~%" main))
   ;; Axis label
   (if x-label (format stream "set xlabel \"~A\"~%" x-label))
   (if y-label (format stream "set ylabel \"~A\"~%" y-label))
@@ -88,6 +91,7 @@
 
 (defun dump-gp-file (plot-arg-format
 		     &key (x-label nil) (y-label nil)
+		       (main nil)
                        (aspect-ratio 1.0)
                        (output nil) (output-format :png)
                        (x-logscale nil) (y-logscale nil)
@@ -96,163 +100,130 @@
   (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
     (dump-gp-stream gp-file plot-arg-format
                     :x-label x-label :y-label y-label
+		    :main main
                     :aspect-ratio aspect-ratio
                     :output output :output-format output-format
                     :x-logscale x-logscale :y-logscale y-logscale
                     :x-range x-range :y-range y-range
                     :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :key key)))
 
-(defun plot-list (y-list
-		  &key (x-list nil) (title " ") (style 'lines)
-		    (x-label nil) (y-label nil)
-		    (aspect-ratio 1.0)
-		    (output nil) (output-format :png)
-		    (x-logscale nil) (y-logscale nil)
-		    (x-range nil) (y-range nil)
-		    (x-range-reverse nil) (y-range-reverse nil) (key t)
-		    (stream nil))
-  (if (null x-list) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
-  (if (not (= (length x-list) (length y-list)))
-    (error "list length mismatch detected between y-list and x-list."))
+(defun plot (y-seq
+	     &key (x-seq nil) (title " ") (style 'lines)
+	       (x-label nil) (y-label nil)
+	       (main nil) (aspect-ratio 1.0)
+	       (output nil) (output-format :png)
+	       (x-logscale nil) (y-logscale nil)
+	       (x-range nil) (y-range nil)
+	       (x-range-reverse nil) (y-range-reverse nil) (key t)
+	       (stream nil))
+  (when (null x-seq)
+    (setf x-seq (loop for i from 0 below (length y-seq) collect i)))
+  (unless (= (length x-seq) (length y-seq))
+    (error "sequence length mismatch detected between y-seq and x-seq."))
   ;; Output to DAT file
   (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
-    (mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))
+    (iter (for x in-sequence x-seq)
+	  (for y in-sequence y-seq)
+	  (format dat-file "~f ~f~%" x y)))
 
   (let ((plot-arg-string (format nil "\"~A\" using 1:2 with ~A title \"~A\""
-				 *tmp-dat-file* (string-downcase (symbol-name style)) title)))
+				 *tmp-dat-file* (string-downcase (string style)) title)))
     (if stream
-      (progn
-	(dump-gp-stream stream
-			plot-arg-string
+	(progn
+	  (dump-gp-stream stream
+			  plot-arg-string
+			  :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
+			  :main main :output output :output-format output-format
+			  :x-logscale x-logscale :y-logscale y-logscale
+			  :x-range x-range :y-range y-range
+			  :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
+			  :key key)
+	  (finish-output stream))
+	;; Output to GP file
+	(progn
+	  (dump-gp-file plot-arg-string
 			:x-label x-label :y-label y-label :aspect-ratio aspect-ratio
-			:output output :output-format output-format
+			:main main :output output :output-format output-format
 			:x-logscale x-logscale :y-logscale y-logscale
 			:x-range x-range :y-range y-range
 			:x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
-			:key key)
-	(finish-output stream))
-      ;; Output to GP file
-      (progn
-	(dump-gp-file plot-arg-string
-		      :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
-		      :output output :output-format output-format
-		      :x-logscale x-logscale :y-logscale y-logscale
-		      :x-range x-range :y-range y-range
-		      :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
-		      :key key)      
-	;; Call Gnuplot
-        (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))))
+			:key key)      
+	  ;; Call Gnuplot
+	  (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))))
 
-(defun plot (y-seq
-             &key (x-seq nil) (title " ") (style 'lines)
-               (x-label nil) (y-label nil)
-               (aspect-ratio 1.0)
-               (output nil) (output-format :png)
-               (x-logscale nil) (y-logscale nil)
-               (x-range nil) (y-range nil)
-               (x-range-reverse nil) (y-range-reverse nil) (key t)
-               (stream nil))
-  (plot-list (coerce y-seq 'list)
-             :x-list (coerce x-seq 'list)
-             :title title
-             :style style
-             :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
-             :output output :output-format output-format
-             :x-logscale x-logscale :y-logscale y-logscale
-             :x-range x-range :y-range y-range
-             :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
-             :key key :stream stream))
 
 (defun comma-separated-concatenate (string-list)
   (reduce (lambda (s1 s2) (concatenate 'string s1 "," s2))
           string-list))
 
 ;; 2つの軸を使いたいときは、
-;; (plot-lists (list list1 list2) :axis-list '(x1y1 x1y2))
+;; (plots (list list1 list2) :axis-list '(x1y1 x1y2))
 ;; のようにする。それ以上の数、スケールの異なるグラフを重ねて表示する場合は、次で定義する正規化機能付きのplot-lists-with-normalizeで表示する
 ;; というか、y-listsに何か関数を噛ませればいいのか。normalize-listを定義したので、これをmapcarすればいい。
 
-(defun plot-lists (y-lists
-		   &key (x-lists nil) (title-list nil) (style 'lines) ; style also accepts list of symbols
-		     (x-label nil) (y-label nil)
-		     (aspect-ratio 1.0)
-		     (output nil) (output-format :png)
-		     (x-logscale nil) (y-logscale nil)
-		     (x-range nil) (y-range nil)
-		     (x-range-reverse nil) (y-range-reverse nil) (key t)
-		     (axis-list nil) ; When axis-list is nil, use x1y1 axis for all plots
-		     (stream nil))
-  (loop for i from 0 to (1- (length y-lists)) do
-    (let ((x-list (nth i x-lists))
-	  (y-list (nth i y-lists)))
-      (if (null x-lists) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
-      (if (not (= (length x-list) (length y-list)))
-	(error "list length mismatch detected between y-list and x-list."))
-      ;; Output to DAT file
-      (with-open-file (dat-file (format nil "~A.~A" *tmp-dat-file* i)
-				:direction :output :if-exists :supersede)
-	(mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))))
+(defun plots (y-seqs
+	      &key (x-seqs nil) (title-list nil) (style 'lines) ; style accepts symbol string and list of symbols and strings
+		(x-label nil) (y-label nil)
+		(main nil) (aspect-ratio 1.0)
+		(output nil) (output-format :png)
+		(x-logscale nil) (y-logscale nil)
+		(x-range nil) (y-range nil)
+		(x-range-reverse nil) (y-range-reverse nil) (key t)
+		(axis-list nil) ; When axis-list is nil, use x1y1 axis for all plots
+		(stream nil))
+  (iter (for i from 0)
+	(for y-seq in-sequence y-seqs)
+	(for x-seq in-sequence x-seqs)
+	(when (null x-seqs)
+	  (setf x-seq (loop for i from 0 below (length y-seq) collect i)))
+	(unless (= (length x-seq) (length y-seq))
+	  (error "sequence length mismatch detected between y-seq and x-seq."))
+	;; Output to DAT file
+	(with-open-file (dat-file (format nil "~A.~A" *tmp-dat-file* i)
+				  :direction :output :if-exists :supersede)
+	  (iter (for x in-sequence x-seq)
+		(for y in-sequence y-seq)
+		(format dat-file "~f ~f~%" x y))))
 
   (if (and (not (null axis-list))
-	   (not (= (length y-lists) (length axis-list))))
-    (error "list length mismatch detected between y-lists and axis-list."))
+	   (not (= (length y-seqs) (length axis-list))))
+      (error "sequence length mismatch detected between y-seqs and axis-list."))
 
-  (if (and (listp style) (not (= (length y-lists) (length style))))
-    (error "list length mismatch detected between y-lists and style."))
+  (if (and (listp style) (not (= (length y-seqs) (length style))))
+      (error "list length mismatch detected between y-lists and style."))
   
   ;; Output to GP file
   (let ((plot-arg-string
          (comma-separated-concatenate
-          (loop for i from 0 to (1- (length y-lists)) collect
-            (format nil "\"~A.~A\" using 1:2 with ~A title \"~A\" axis ~A"
-                    *tmp-dat-file*
-                    i
-                    (if (symbolp style)
-                      (string-downcase (symbol-name style))
-                      (string-downcase (symbol-name (nth i style))))
-                    (if (null title-list) " " (nth i title-list))
-                    (if (null axis-list) "x1y1" (string-downcase (symbol-name (nth i axis-list)))))))))
+          (loop for i from 0 below (length y-seqs) collect
+	       (format nil "\"~A.~A\" using 1:2 with ~A title \"~A\" axis ~A"
+		       *tmp-dat-file*
+		       i
+		       (if (listp style)
+			   (string-downcase (string (nth i style)))
+			   (string-downcase (string style)))                      
+		       (if (null title-list) " " (nth i title-list))
+		       (if (null axis-list) "x1y1" (string-downcase (string (nth i axis-list)))))))))
     (if stream
-      (progn (dump-gp-stream stream
-			     plot-arg-string
+	(progn (dump-gp-stream stream
+			       plot-arg-string
+			       :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
+			       :main main :output output :output-format output-format
+			       :x-logscale x-logscale :y-logscale y-logscale
+			       :x-range x-range :y-range y-range
+			       :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
+			       :key key)
+	       (finish-output stream))
+	(progn (dump-gp-file plot-arg-string
 			     :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
-			     :output output :output-format output-format
+			     :main main :output output :output-format output-format
 			     :x-logscale x-logscale :y-logscale y-logscale
 			     :x-range x-range :y-range y-range
 			     :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
 			     :key key)
-	     (finish-output stream))
-      (progn (dump-gp-file plot-arg-string
-			   :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
-			   :output output :output-format output-format
-			   :x-logscale x-logscale :y-logscale y-logscale
-			   :x-range x-range :y-range y-range
-			   :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
-			   :key key)
-             ;; Call Gnuplot
-	     (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))))
+	       ;; Call Gnuplot
+	       (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))))
 
-(defun plots (y-seqs
-              &key (x-seqs nil) (title-list nil) (style 'lines) ; style also accepts list of symbols
-                (x-label nil) (y-label nil)
-                (aspect-ratio 1.0)
-                (output nil) (output-format :png)
-                (x-logscale nil) (y-logscale nil)
-                (x-range nil) (y-range nil)
-                (x-range-reverse nil) (y-range-reverse nil) (key t)
-                (axis-list nil) ; When axis-list is nil, use x1y1 axis for all plots
-                (stream nil))
-  (plot-lists (map 'list (lambda (seq) (coerce seq 'list)) y-seqs)
-              :x-lists (map 'list (lambda (seq) (coerce seq 'list)) x-seqs)
-              :title-list title-list :style style
-              :x-label x-label :y-label y-label
-              :aspect-ratio aspect-ratio
-              :output output :output-format output-format
-              :x-logscale x-logscale :y-logscale y-logscale
-              :x-range x-range :y-range y-range
-              :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :key key
-              :axis-list axis-list
-              :stream stream))
 
 ;; ;;; listを[0,1]の範囲に正規化する
 ;; (defun normalize-list (list)
@@ -360,7 +331,7 @@
 
 (defun dump-gp-file-append (plot-arg-format
 			    &key (x-label nil) (y-label nil)
-			    (aspect-ratio 1.0)
+			    (main nil) (aspect-ratio 1.0)
 			    (output nil) (output-format :png)
 			    (x-logscale nil) (y-logscale nil)
 			    (x-range nil) (y-range nil)
@@ -368,7 +339,8 @@
   (declare (ignore output output-format))
   (with-open-file (gp-file *tmp-gp-file* :direction :output
 			   :if-exists :append :if-does-not-exist :create)
-    
+
+    (when main (format gp-file "set title \"~A\"~%" main))
     ;; 軸のラベル
     (if x-label (format gp-file "set xlabel \"~A\"~%" x-label))
     (if y-label (format gp-file "set ylabel \"~A\"~%" y-label))
@@ -405,7 +377,7 @@
 (defun plot-list-for-multiplot (plot-id y-list
 				&key (x-list nil) (title " ") (style 'lines)
 				(x-label nil) (y-label nil)
-				(aspect-ratio 1.0)
+				(main nil) (aspect-ratio 1.0)
 				(output nil) (output-format :png)
 				(x-logscale nil) (y-logscale nil)
 				(x-range nil) (y-range nil)
@@ -422,7 +394,7 @@
   (dump-gp-file-append (format nil "\"~A.plot-id~A\" using 1:2 with ~A title \"~A\""
 			       *tmp-dat-file* plot-id (string-downcase (symbol-name style)) title)
 		       :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
-		       :output output :output-format output-format
+		       :main main :output output :output-format output-format
 		       :x-logscale x-logscale :y-logscale y-logscale
 		       :x-range x-range :y-range y-range
 		       :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
@@ -431,7 +403,7 @@
 (defun plot-lists-for-multiplot (plot-id y-lists
 				 &key (x-lists nil) (title-list nil) (style 'lines)
 				 (x-label nil) (y-label nil)
-				 (aspect-ratio 1.0)
+				 (main nil) (aspect-ratio 1.0)
 				 (output nil) (output-format :png)
 				 (x-logscale nil) (y-logscale nil)
 				 (x-range nil) (y-range nil)
@@ -455,7 +427,7 @@
 				     *tmp-dat-file* plot-id i (string-downcase (symbol-name style))
 				     (if (null title-list) " " (nth i title-list)))))
 		       :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
-		       :output output :output-format output-format
+		       :main main :output output :output-format output-format
 		       :x-logscale x-logscale :y-logscale y-logscale
 		       :x-range x-range :y-range y-range
 		       :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
@@ -466,9 +438,9 @@
      (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
        (format gp-file "set multiplot layout ~A,1~%set format y \"%.3f\"~%" ,(length body)))
      (loop for plot-id from 0 to ,(1- (length body)) do
-	  (cond ((eq (car (nth plot-id ',body)) 'plot-list)
+	  (cond ((eq (car (nth plot-id ',body)) 'plot)
 		 (apply #'plot-list-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))
-		((eq (car (nth plot-id ',body)) 'plot-lists)
+		((eq (car (nth plot-id ',body)) 'plots)
 		 (apply #'plot-lists-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))))
      (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :append)
        (format gp-file "unset multiplot~%"))
@@ -496,7 +468,7 @@
     (plot-arg-format
      &key
        (x-label nil) (y-label nil) (z-label nil)
-       (aspect-ratio 1.0)
+       (main nil) (aspect-ratio 1.0)
        (output nil) (output-format :png)
        (x-logscale nil) (y-logscale nil) (z-logscale nil)
        (x-range nil) (y-range nil) (z-range nil)
@@ -520,7 +492,8 @@
 	     (:png-monochrome (format gp-file "set term png monochrome~%")))
 	   (format gp-file "set output \"~A\"~%" output))
 	  (t (format gp-file "set term ~A~%" *default-terminal*)))
-    
+
+    (when main (format gp-file "set title \"~A\"~%" main))
     ;; 軸のラベル
     (if x-label (format gp-file "set xlabel \"~A\"~%" x-label))
     (if y-label (format gp-file "set ylabel \"~A\"~%" y-label))
@@ -583,7 +556,7 @@
 (defun splot-list (z-func x-list y-list
 		   &key (title " ") (style 'lines)
                      (x-label nil) (y-label nil) (z-label nil)
-                     (aspect-ratio 1.0)
+                     (main nil) (aspect-ratio 1.0)
                      (output nil) (output-format :png)
                      (x-logscale nil) (y-logscale nil) (z-logscale nil)
                      (x-range nil) (y-range nil) (z-range nil)
@@ -606,7 +579,7 @@
        (format nil "\"~A\" using 1:2:3 with ~A title \"~A\""
 	       *tmp-dat-file* (string-downcase (symbol-name style)) title))
    :x-label x-label :y-label y-label :z-label z-label
-   :aspect-ratio aspect-ratio
+   :main main :aspect-ratio aspect-ratio
    :output output :output-format output-format
    :x-logscale x-logscale :y-logscale y-logscale :z-logscale z-logscale
    :x-range (if map
@@ -648,15 +621,15 @@
 			      (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
 			      (palette :jet) (key t))
   (flet ((seq-row (start end)
-	   (nlet iter ((i start) (product nil))
+	   (nlet iteration ((i start) (product nil))
 	     (if (> i end)
 	       (reverse product)
-	       (iter (1+ i) (cons (+ i 0.999) (cons (+ i 0.999) (cons i (cons i product))))))))
+	       (iteration (1+ i) (cons (+ i 0.999) (cons (+ i 0.999) (cons i (cons i product))))))))
 	 (seq-col (start end)
-	   (nlet iter ((i start) (product nil))
+	   (nlet iteration ((i start) (product nil))
 	     (if (> i end)
 	       (reverse product)
-	       (iter (1+ i) (cons (+ i 0.999) (cons i (cons (+ i 0.999) (cons i product)))))))))
+	       (iteration (1+ i) (cons (+ i 0.999) (cons i (cons (+ i 0.999) (cons i product)))))))))
     (splot-list (lambda (x y)
 		  (aref matrix (truncate x) (truncate y)))
 		(seq-row 0 (1- (array-dimension matrix 0)))

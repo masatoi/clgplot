@@ -11,7 +11,7 @@
   :version "0.1"
   :author ""
   :license ""
-  :depends-on (:external-program)
+  :depends-on (:external-program :iterate)
   :components ((:module "src"
                 :components
                 ((:file "clgplot"))))

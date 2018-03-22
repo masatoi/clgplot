@@ -176,7 +176,7 @@
       (error "sequence length mismatch detected between y-seq and x-seq."))
 
     ;; Output to DAT file
-    (with-open-file (dat-file ≫(format nil "~A.~A" *tmp-dat-file* i)
+    (with-open-file (dat-file (format nil "~A.~A" *tmp-dat-file* i)
                                 :direction :output :if-exists :supersede)
       (iter (for x in-sequence x-seq) (for y in-sequence y-seq)
         (format dat-file "~f ~f~%" x y))))

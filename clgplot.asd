@@ -9,16 +9,16 @@
 
 (defsystem clgplot
   :version "0.1"
-  :author ""
-  :license ""
+  :author "Satoshi Imai"
+  :license "MIT Licence"
   :depends-on (:external-program :iterate)
   :components ((:module "src"
                 :components
                 ((:file "clgplot"))))
-  :description ""
+  :description "A Gnuplot front-end for Common lisp"
   :long-description
   #.(with-open-file (stream (merge-pathnames
-                             #p"README.markdown"
+                             #p"README.org"
                              (or *load-pathname* *compile-file-pathname*))
                             :if-does-not-exist nil
                             :direction :input)

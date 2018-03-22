@@ -6,16 +6,11 @@
   (:nicknames :clgp)
   (:export :*gnuplot-path* :*tmp-dat-file* :*tmp-gp-file* :*default-terminal*
            :seq
-           :plot :plots
-           :plot-histogram :plot-histogram-with-pdf
-           :splot-list :splot :splot-matrix))
+   :plot :plots
+   :plot-histogram :plot-histogram-with-pdf
+   :splot-list :splot :splot-matrix))
 
 (in-package :clgplot)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; interface to GNUPLOT ;;;
-;;;  gnuplot 4 required  ;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defparameter *gnuplot-path* "gnuplot")
 (defparameter *tmp-dat-file* "/tmp/clgplot-tmp.dat")
@@ -29,7 +24,6 @@
 ;; named-let
 (defmacro nlet (tag var-vals &body body)
   `(labels ((,tag ,(mapcar #'car var-vals) ,@body))
-     (declare (optimize (speed 3))) ; for tail recursion optimization
      (,tag ,@(mapcar #'cadr var-vals))))
 
 (defun last1 (lst)
@@ -39,6 +33,7 @@
   (loop for x from start to end by by collect x))
 
 ;;;
+
 (defun dump-gp-stream (stream plot-arg-format
 		       &key (x-label nil) (y-label nil)
 			 (main nil)
@@ -68,16 +63,16 @@
   (if y-label (format stream "set ylabel \"~A\"~%" y-label))
   ;; Input range, Increase direction of X
   (if x-range
-    (format stream "set xrange [~f:~f] " (car x-range) (cadr x-range))
-    (format stream "set xrange [] "))
+      (format stream "set xrange [~f:~f] " (car x-range) (cadr x-range))
+      (format stream "set xrange [] "))
   (if x-range-reverse
-    (format stream "reverse"))
+      (format stream "reverse"))
   (format stream "~%")
   (if y-range
-    (format stream "set yrange [~f:~f] " (car y-range) (cadr y-range))
-    (format stream "set yrange [] "))
+      (format stream "set yrange [~f:~f] " (car y-range) (cadr y-range))
+      (format stream "set yrange [] "))
   (if y-range-reverse
-    (format stream "reverse"))
+      (format stream "reverse"))
   (format stream "~%")
   ;; Use of logscale
   (if x-logscale (format stream "set logscale x~%"))
@@ -123,8 +118,8 @@
   ;; Output to DAT file
   (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
     (iter (for x in-sequence x-seq)
-	  (for y in-sequence y-seq)
-	  (format dat-file "~f ~f~%" x y)))
+      (for y in-sequence y-seq)
+      (format dat-file "~f ~f~%" x y)))
 
   (let ((plot-arg-string (format nil "\"~A\" using 1:2 with ~A title \"~A\""
 				 *tmp-dat-file* (string-downcase (string style)) title)))
@@ -151,7 +146,6 @@
 	  ;; Call Gnuplot
 	  (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))))
 
-
 (defun comma-separated-concatenate (string-list)
   (reduce (lambda (s1 s2) (concatenate 'string s1 "," s2))
           string-list))
@@ -171,19 +165,21 @@
 		(x-range-reverse nil) (y-range-reverse nil) (key t)
 		(axis-list nil) ; When axis-list is nil, use x1y1 axis for all plots
 		(stream nil))
-  (iter (for i from 0)
-	(for y-seq in-sequence y-seqs)
-	(for x-seq in-sequence x-seqs)
-	(when (null x-seqs)
-	  (setf x-seq (loop for i from 0 below (length y-seq) collect i)))
-	(unless (= (length x-seq) (length y-seq))
-	  (error "sequence length mismatch detected between y-seq and x-seq."))
-	;; Output to DAT file
-	(with-open-file (dat-file (format nil "~A.~A" *tmp-dat-file* i)
-				  :direction :output :if-exists :supersede)
-	  (iter (for x in-sequence x-seq)
-		(for y in-sequence y-seq)
-		(format dat-file "~f ~f~%" x y))))
+  
+  (when (null x-seqs)
+    (setf x-seqs (make-list (length y-seqs))))
+  
+  (iter (for i from 0) (for y-seq in-sequence y-seqs) (for x-seq in-sequence x-seqs)
+    (when (null x-seq)
+      (setf x-seq (loop for i from 0 below (length y-seq) collect i)))
+    (unless (= (length x-seq) (length y-seq))
+      (error "sequence length mismatch detected between y-seq and x-seq."))
+
+    ;; Output to DAT file
+    (with-open-file (dat-file ≫(format nil "~A.~A" *tmp-dat-file* i)
+                                :direction :output :if-exists :supersede)
+      (iter (for x in-sequence x-seq) (for y in-sequence y-seq)
+        (format dat-file "~f ~f~%" x y))))
 
   (if (and (not (null axis-list))
 	   (not (= (length y-seqs) (length axis-list))))
@@ -194,16 +190,17 @@
   
   ;; Output to GP file
   (let ((plot-arg-string
-         (comma-separated-concatenate
-          (loop for i from 0 below (length y-seqs) collect
-	       (format nil "\"~A.~A\" using 1:2 with ~A title \"~A\" axis ~A"
-		       *tmp-dat-file*
-		       i
-		       (if (listp style)
-			   (string-downcase (string (nth i style)))
-			   (string-downcase (string style)))                      
-		       (if (null title-list) " " (nth i title-list))
-		       (if (null axis-list) "x1y1" (string-downcase (string (nth i axis-list)))))))))
+          (comma-separated-concatenate
+           (iter (for i from 0 below (length y-seqs))
+             (collect
+                 (format nil "\"~A.~A\" using 1:2 with ~A title \"~A\" axis ~A"
+                         *tmp-dat-file*
+                         i
+                         (if (listp style)
+                             (string-downcase (string (nth i style)))
+                             (string-downcase (string style)))                      
+                         (if (null title-list) " " (nth i title-list))
+                         (if (null axis-list) "x1y1" (string-downcase (string (nth i axis-list))))))))))
     (if stream
 	(progn (dump-gp-stream stream
 			       plot-arg-string
@@ -225,7 +222,7 @@
 	       (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))))
 
 
-;; ;;; listを[0,1]の範囲に正規化する
+;; ;;; normalize list between [0,1]
 ;; (defun normalize-list (list)
 ;;   (let ((max-elem (loop for x in list maximize x))
 ;; 	(min-elem (loop for x in list minimize x)))
@@ -265,8 +262,8 @@
 ;; サンプルのリストsamplesをrange幅で分割し,それぞれの区間での登場回数を数え上げる.
 ;; 各区間のサンプル登場回数のリストを返す.
 (defun plot-histogram (samples n-of-bin &key (output nil)
-		       (x-range nil) (y-range nil)
-		       (x-logscale nil) (y-logscale nil))
+                                          (x-range nil) (y-range nil)
+                                          (x-logscale nil) (y-logscale nil))
   (multiple-value-bind (a b)
       (search-min-max samples)
     (let ((counter (make-list n-of-bin :initial-element 0))
@@ -278,9 +275,9 @@
       ;; datファイルに出力
       (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
 	(loop for i from 0  to (1- n-of-bin) do
-	     (format dat-file "~f ~A~%"
-		     (/ (+ (+ a (* i span)) (+ a (* (1+ i) span))) 2.0)
-		     (nth i counter))))
+          (format dat-file "~f ~A~%"
+                  (/ (+ (+ a (* i span)) (+ a (* (1+ i) span))) 2.0)
+                  (nth i counter))))
       ;; gpファイルに出力
       (dump-gp-file (format nil "\"~A\" using 1:2:(~f) with boxes fs solid 0.2 title \" \"" *tmp-dat-file* span)
 		    :output output :x-range x-range :y-range y-range :x-logscale x-logscale :y-logscale y-logscale)
@@ -294,8 +291,8 @@
        (* (sqrt (* 2 pi)) sd))))
 
 (defun plot-histogram-with-pdf (samples n-of-bin pdf &key (output nil)
-				(x-range nil) (y-range nil)
-				(x-logscale nil) (y-logscale nil))
+                                                       (x-range nil) (y-range nil)
+                                                       (x-logscale nil) (y-logscale nil))
   (let ((n-of-samples (length samples)))
     (multiple-value-bind (a b)
 	(search-min-max samples)
@@ -308,17 +305,17 @@
 	;; datファイルに出力
 	(with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
 	  (loop for i from 0  to (1- n-of-bin) do
-	       (format dat-file "~f ~f~%"
-		       (/ (+ (+ a (* i span)) (+ a (* (1+ i) span))) 2.0)
-		       ;;(nth i counter)
-		       (/ (nth i counter) (* span n-of-samples))
-		       )))
+            (format dat-file "~f ~f~%"
+                    (/ (+ (+ a (* i span)) (+ a (* (1+ i) span))) 2.0)
+                    ;;(nth i counter)
+                    (/ (nth i counter) (* span n-of-samples))
+                    )))
 	(with-open-file (dat-file (concatenate 'string *tmp-dat-file* ".pdfdat")
 				  :direction :output :if-exists :supersede)
 	  (loop for i from a to b by (/ (- b a) 100) do
-	       (format dat-file "~f ~f~%"
-		       i
-		       (funcall pdf i))))
+            (format dat-file "~f ~f~%"
+                    i
+                    (funcall pdf i))))
 	;; gpファイルに出力
 	(dump-gp-file (format nil "\"~A\" using 1:2:(~f) with boxes fs solid 0.2 title \" \", \"~A\" using 1:2 with lines title \" \""
 			      *tmp-dat-file* span (concatenate 'string *tmp-dat-file* ".pdfdat"))
@@ -331,14 +328,14 @@
 
 (defun dump-gp-file-append (plot-arg-format
 			    &key (x-label nil) (y-label nil)
-			    (main nil) (aspect-ratio 1.0)
-			    (output nil) (output-format :png)
-			    (x-logscale nil) (y-logscale nil)
-			    (x-range nil) (y-range nil)
-			    (x-range-reverse nil) (y-range-reverse nil) (key t))
+                              (main nil) (aspect-ratio 1.0)
+                              (output nil) (output-format :png)
+                              (x-logscale nil) (y-logscale nil)
+                              (x-range nil) (y-range nil)
+                              (x-range-reverse nil) (y-range-reverse nil) (key t))
   (declare (ignore output output-format))
   (with-open-file (gp-file *tmp-gp-file* :direction :output
-			   :if-exists :append :if-does-not-exist :create)
+                                         :if-exists :append :if-does-not-exist :create)
 
     (when main (format gp-file "set title \"~A\"~%" main))
     ;; 軸のラベル
@@ -376,12 +373,12 @@
 ;; nlisp-wrapper互換のgnuplot出力用ルーチン
 (defun plot-list-for-multiplot (plot-id y-list
 				&key (x-list nil) (title " ") (style 'lines)
-				(x-label nil) (y-label nil)
-				(main nil) (aspect-ratio 1.0)
-				(output nil) (output-format :png)
-				(x-logscale nil) (y-logscale nil)
-				(x-range nil) (y-range nil)
-				(x-range-reverse nil) (y-range-reverse nil) (key t))
+                                  (x-label nil) (y-label nil)
+                                  (main nil) (aspect-ratio 1.0)
+                                  (output nil) (output-format :png)
+                                  (x-logscale nil) (y-logscale nil)
+                                  (x-range nil) (y-range nil)
+                                  (x-range-reverse nil) (y-range-reverse nil) (key t))
   (if (null x-list) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
   ;; 長さチェック
   (if (not (= (length x-list) (length y-list)))
@@ -402,30 +399,30 @@
 
 (defun plot-lists-for-multiplot (plot-id y-lists
 				 &key (x-lists nil) (title-list nil) (style 'lines)
-				 (x-label nil) (y-label nil)
-				 (main nil) (aspect-ratio 1.0)
-				 (output nil) (output-format :png)
-				 (x-logscale nil) (y-logscale nil)
-				 (x-range nil) (y-range nil)
-				 (x-range-reverse nil) (y-range-reverse nil) (key t))
+                                   (x-label nil) (y-label nil)
+                                   (main nil) (aspect-ratio 1.0)
+                                   (output nil) (output-format :png)
+                                   (x-logscale nil) (y-logscale nil)
+                                   (x-range nil) (y-range nil)
+                                   (x-range-reverse nil) (y-range-reverse nil) (key t))
   (loop for i from 0 to (1- (length y-lists)) do
-       (let ((x-list (nth i x-lists))
-	     (y-list (nth i y-lists)))
-	 (if (null x-lists) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
-	 ;; 長さチェック
-	 (if (not (= (length x-list) (length y-list)))
-	     (error "list length mismatch detected between y-list and x-list."))
-	 ;; datファイルに出力
-	 (with-open-file (dat-file (format nil "~A.plot-id~A.~A" *tmp-dat-file* plot-id i)
-				   :direction :output :if-exists :supersede)
-	   (mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))))
+    (let ((x-list (nth i x-lists))
+          (y-list (nth i y-lists)))
+      (if (null x-lists) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
+      ;; 長さチェック
+      (if (not (= (length x-list) (length y-list)))
+          (error "list length mismatch detected between y-list and x-list."))
+      ;; datファイルに出力
+      (with-open-file (dat-file (format nil "~A.plot-id~A.~A" *tmp-dat-file* plot-id i)
+                                :direction :output :if-exists :supersede)
+        (mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))))
   
   ;; gpファイルに出力
   (dump-gp-file-append (comma-separated-concatenate
 			(loop for i from 0 to (1- (length y-lists)) collect
-			     (format nil "\"~A.plot-id~A.~A\" using 1:2 with ~A title \"~A\""
-				     *tmp-dat-file* plot-id i (string-downcase (symbol-name style))
-				     (if (null title-list) " " (nth i title-list)))))
+                                                                    (format nil "\"~A.plot-id~A.~A\" using 1:2 with ~A title \"~A\""
+                                                                            *tmp-dat-file* plot-id i (string-downcase (symbol-name style))
+                                                                            (if (null title-list) " " (nth i title-list)))))
 		       :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
 		       :main main :output output :output-format output-format
 		       :x-logscale x-logscale :y-logscale y-logscale
@@ -438,18 +435,17 @@
      (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
        (format gp-file "set multiplot layout ~A,1~%set format y \"%.3f\"~%" ,(length body)))
      (loop for plot-id from 0 to ,(1- (length body)) do
-	  (cond ((eq (car (nth plot-id ',body)) 'plot)
-		 (apply #'plot-list-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))
-		((eq (car (nth plot-id ',body)) 'plots)
-		 (apply #'plot-lists-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))))
+       (cond ((eq (car (nth plot-id ',body)) 'plot)
+              (apply #'plot-list-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))
+             ((eq (car (nth plot-id ',body)) 'plots)
+              (apply #'plot-lists-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))))
      (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :append)
        (format gp-file "unset multiplot~%"))
      ;; gnuplotを呼び出し
      (external-program:run *gnuplot-path* (list "-persist" *tmp-gp-file*))))
 
+;;; Asynchronous version
 
-;;; 二次元プロットをアニメーションで表示するときに利用する、非同期バージョン
-;;; dump-gp-fileをファイルではなくストリームに出力するようにして、with-plot-streamマクロの中でそれを呼ぶ
 (defmacro with-plot-stream (stream &body body)
   (let ((proc (gensym)))
     `(let* ((,proc (external-program:start *gnuplot-path* nil :input :stream :output :stream))
@@ -463,7 +459,7 @@
 	   (external-program:signal-process ,proc :quit)))
        ,proc)))
 
-;;; 三次元プロット
+;;; 3-dimension plot
 (defun dump-gp-file-3d
     (plot-arg-format
      &key
@@ -565,12 +561,12 @@
                      (palette :jet) (key t) (map nil))
   ;; Output to DAT file
   (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
-      (mapc #'(lambda (x)
-		(mapc #'(lambda (y)
-			  (format dat-file "~f ~f ~f~%" x y (funcall z-func x y)))
-		      y-list)
-		(format dat-file "~%")) ; xの値が変わるごとに改行を入れることでグリッドデータとして認識される
-	    x-list))
+    (mapc #'(lambda (x)
+              (mapc #'(lambda (y)
+                        (format dat-file "~f ~f ~f~%" x y (funcall z-func x y)))
+                    y-list)
+              (format dat-file "~%")) ; xの値が変わるごとに改行を入れることでグリッドデータとして認識される
+          x-list))
   ;; Output to DAT file
   (dump-gp-file-3d
    (if map
@@ -623,13 +619,13 @@
   (flet ((seq-row (start end)
 	   (nlet iteration ((i start) (product nil))
 	     (if (> i end)
-	       (reverse product)
-	       (iteration (1+ i) (cons (+ i 0.999) (cons (+ i 0.999) (cons i (cons i product))))))))
+                 (reverse product)
+                 (iteration (1+ i) (cons (+ i 0.999) (cons (+ i 0.999) (cons i (cons i product))))))))
 	 (seq-col (start end)
 	   (nlet iteration ((i start) (product nil))
 	     (if (> i end)
-	       (reverse product)
-	       (iteration (1+ i) (cons (+ i 0.999) (cons i (cons (+ i 0.999) (cons i product)))))))))
+                 (reverse product)
+                 (iteration (1+ i) (cons (+ i 0.999) (cons i (cons (+ i 0.999) (cons i product)))))))))
     (splot-list (lambda (x y)
 		  (aref matrix (truncate x) (truncate y)))
 		(seq-row 0 (1- (array-dimension matrix 0)))

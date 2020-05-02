@@ -8,10 +8,10 @@
 (in-package :clgplot-asd)
 
 (defsystem clgplot
-  :version "0.1"
+  :version "0.2"
   :author "Satoshi Imai"
   :license "MIT Licence"
-  :depends-on (:external-program :iterate)
+  :depends-on (:uiop :iterate)
   :components ((:module "src"
                 :components
                 ((:file "clgplot"))))

@@ -2,13 +2,21 @@
 
 (in-package :cl-user)
 (defpackage :clgplot
-  (:use :cl :iter)
+  (:use #:cl
+        #:iter)
   (:nicknames :clgp)
-  (:export :*gnuplot-path* :*tmp-dat-file* :*tmp-gp-file* :*default-terminal*
-           :seq
-   :plot :plots
-   :plot-histogram :plot-histogram-with-pdf
-   :splot-list :splot :splot-matrix))
+  (:export #:*gnuplot-path*
+           #:*tmp-dat-file*
+           #:*tmp-gp-file*
+           #:*default-terminal*
+           #:seq
+           #:plot
+           #:plots
+           #:plot-histogram
+           #:plot-histogram-with-pdf
+           #:splot-list
+           #:splot
+           #:splot-matrix))
 
 (in-package :clgplot)
 
@@ -16,8 +24,10 @@
 (defparameter *tmp-dat-file* "/tmp/clgplot-tmp.dat")
 (defparameter *tmp-gp-file* "/tmp/clgplot-tmp.gp")
 (defparameter *default-terminal*
-  #-windows "x11"
-  #+windows "windows")
+  (cond ((member :linux cl:*features*) "x11")
+        ((member :darwin cl:*features*) "qt")
+        ((member :windows cl:*features*) "windows")
+        (otherwise "x11")))
 
 ;;; Utilities
 
@@ -153,11 +163,6 @@
   (reduce (lambda (s1 s2) (concatenate 'string s1 "," s2))
           string-list))
 
-;; 2つの軸を使いたいときは、
-;; (plots (list list1 list2) :axis-list '(x1y1 x1y2))
-;; のようにする。それ以上の数、スケールの異なるグラフを重ねて表示する場合は、次で定義する正規化機能付きのplot-lists-with-normalizeで表示する
-;; というか、y-listsに何か関数を噛ませればいいのか。normalize-listを定義したので、これをmapcarすればいい。
-
 (defun plots (y-seqs
 	      &key (x-seqs nil) (title-list nil) (style 'lines) ; style accepts symbol string and list of symbols and strings
                    (x-label nil) (y-label nil)
@@ -166,7 +171,9 @@
                    (x-logscale nil) (y-logscale nil)
                    (x-range nil) (y-range nil)
                    (x-range-reverse nil) (y-range-reverse nil) (key t)
-                   (axis-list nil) ; When axis-list is nil, use x1y1 axis for all plots
+                   ;; When axis-list is nil, use x1y1 axis for all plots.
+                   ;; To use two axis: (plots (list list1 list2) :axis-list '(x1y1 x1y2))
+                   (axis-list nil)
                    (stream nil))
   
   (when (null x-seqs)
@@ -224,20 +231,20 @@
 	       ;; Call Gnuplot
                (run)))))
 
-
-;; ;;; normalize list between [0,1]
-;; (defun normalize-list (list)
-;;   (let ((max-elem (loop for x in list maximize x))
-;; 	(min-elem (loop for x in list minimize x)))
-;;     (if (> min-elem 0)
-;; 	(mapcar (lambda (elem)
-;; 		  (/ (- elem min-elem)
-;; 		     (abs (- max-elem min-elem))))
-;; 		list)
-;; 	(mapcar (lambda (elem)
-;; 		  (/ (+ elem min-elem)
-;; 		     (abs (- max-elem min-elem))))
-;; 		list))))
+;;; normalize list between [0,1]
+#+(or)
+(defun normalize-list (list)
+  (let ((max-elem (loop for x in list maximize x))
+	(min-elem (loop for x in list minimize x)))
+    (if (> min-elem 0)
+	(mapcar (lambda (elem)
+		  (/ (- elem min-elem)
+		     (abs (- max-elem min-elem))))
+		list)
+	(mapcar (lambda (elem)
+		  (/ (+ elem min-elem)
+		     (abs (- max-elem min-elem))))
+		list))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; histogram ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

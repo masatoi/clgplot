@@ -27,7 +27,7 @@
   (cond ((member :linux cl:*features*) "x11")
         ((member :darwin cl:*features*) "qt")
         ((member :windows cl:*features*) "windows")
-        (otherwise "x11")))
+        (t "x11")))
 
 ;;; Utilities
 

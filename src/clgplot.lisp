@@ -94,7 +94,9 @@
   ;; Aspect ratio
   (if aspect-ratio (format stream "set size ratio ~f~%" aspect-ratio))
   ;; Graph legend enable/disable, or its position
-  key
+  (if key
+      (format stream "set key~%")
+      (format stream "set nokey~%"))
   
   (format stream (concatenate 'string "plot " plot-arg-format)))
 
@@ -202,12 +204,12 @@
       (iter (for x in-sequence x-seq) (for y in-sequence y-seq)
         (format dat-file "~f ~f~%" x y))))
 
-  (if (and (not (null axis-list))
-	   (not (= (length y-seqs) (length axis-list))))
-      (error "sequence length mismatch detected between y-seqs and axis-list."))
+  (when (and (not (null axis-list))
+	     (not (= (length y-seqs) (length axis-list))))
+    (error "sequence length mismatch detected between y-seqs and axis-list."))
 
-  (if (and (listp style) (not (= (length y-seqs) (length style))))
-      (error "list length mismatch detected between y-lists and style."))
+  (when (and (listp style) (not (= (length y-seqs) (length style))))
+    (error "list length mismatch detected between y-lists and style."))
   
   ;; Output to GP file
   (let ((plot-arg-string
@@ -346,7 +348,7 @@
                                  (x-logscale nil) (y-logscale nil)
                                  (x-range nil) (y-range nil)
                                  (x-range-reverse nil) (y-range-reverse nil) (key t))
-  (declare (ignore output output-format key))
+  (declare (ignore output output-format))
   (with-open-file (gp-file *tmp-gp-file* :direction :output
                                          :if-exists :append :if-does-not-exist :create)
 
@@ -373,25 +375,32 @@
     
     (if aspect-ratio (format gp-file "set size ratio ~f~%" aspect-ratio))
 
+    (if key
+        (format gp-file "set key~%")
+        (format gp-file "set nokey~%"))
+
     (format gp-file (concatenate 'string "plot " plot-arg-format "~%"))))
 
-(defun plot-list-for-multiplot (plot-id y-list
-				&key (x-list nil) (title " ") (style 'lines)
-                                     (x-label nil) (y-label nil)
-                                     (main nil) (aspect-ratio 1.0)
-                                     (output nil) (output-format :png)
-                                     (x-logscale nil) (y-logscale nil)
-                                     (x-range nil) (y-range nil)
-                                     (x-range-reverse nil) (y-range-reverse nil) (key t))
-  (if (null x-list) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
-
-  (if (not (= (length x-list) (length y-list)))
-      (error "list length mismatch detected between y-list and x-list."))
-
+(defun plot-for-multiplot (plot-id y-seq
+			   &key (x-seq nil) (title " ") (style 'lines)
+                                (x-label nil) (y-label nil)
+                                (main nil) (aspect-ratio 1.0)
+                                (output nil) (output-format :png)
+                                (x-logscale nil) (y-logscale nil)
+                                (x-range nil) (y-range nil)
+                                (x-range-reverse nil) (y-range-reverse nil) (key t))
+  (assert (appropriate-style-p style))
+  (when (null x-seq)
+    (setf x-seq (loop for i from 0 below (length y-seq) collect i)))
+  (unless (= (length x-seq) (length y-seq))
+    (error "sequence length mismatch detected between y-seq and x-seq."))
+  
   ;; Output to DAT file
   (with-open-file (dat-file (format nil "~A.plot-id~A" *tmp-dat-file* plot-id)
 			    :direction :output :if-exists :supersede)
-    (mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))
+    (iter (for x in-sequence x-seq)
+      (for y in-sequence y-seq)
+      (format dat-file "~f ~f~%" x y)))
 
   ;; Output to GP file
   (dump-gp-file-append (format nil "\"~A.plot-id~A\" using 1:2 with ~A title \"~A\""
@@ -403,56 +412,82 @@
 		       :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
 		       :key key))
 
-(defun plot-lists-for-multiplot (plot-id y-lists
-				 &key (x-lists nil) (title-list nil) (style 'lines)
-                                      (x-label nil) (y-label nil)
-                                      (main nil) (aspect-ratio 1.0)
-                                      (output nil) (output-format :png)
-                                      (x-logscale nil) (y-logscale nil)
-                                      (x-range nil) (y-range nil)
-                                      (x-range-reverse nil) (y-range-reverse nil) (key t))
-  (loop for i from 0 to (1- (length y-lists)) do
-    (let ((x-list (nth i x-lists))
-          (y-list (nth i y-lists)))
-      (if (null x-lists) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
-      (if (not (= (length x-list) (length y-list)))
-          (error "list length mismatch detected between y-list and x-list."))
-      ;; Output to DAT file
-      (with-open-file (dat-file (format nil "~A.plot-id~A.~A" *tmp-dat-file* plot-id i)
-                                :direction :output :if-exists :supersede)
-        (mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))))
+(defun plots-for-multiplot (plot-id y-seqs
+			    &key (x-seqs nil) (title-list nil) (style 'lines)
+                                 (x-label nil) (y-label nil)
+                                 (main nil) (aspect-ratio 1.0)
+                                 (output nil) (output-format :png)
+                                 (x-logscale nil) (y-logscale nil)
+                                 (x-range nil) (y-range nil)
+                                 (x-range-reverse nil) (y-range-reverse nil) (key t)
+                                 ;; When axis-list is nil, use x1y1 axis for all plots.
+                                 ;; To use two axis: (plots (list list1 list2) :axis-list '(x1y1 x1y2))
+                                 (axis-list nil))
+  (iter (for i from 0) (for y-seq in-sequence y-seqs) (for x-seq in-sequence x-seqs)
+    (when (null x-seq)
+      (setf x-seq (loop for i from 0 below (length y-seq) collect i)))
+    (unless (= (length x-seq) (length y-seq))
+      (error "sequence length mismatch detected between y-seq and x-seq."))
+    ;; Output to DAT file
+    (with-open-file (dat-file (format nil "~A.plot-id~A.~A" *tmp-dat-file* plot-id i)
+                              :direction :output :if-exists :supersede)
+      (iter (for x in-sequence x-seq) (for y in-sequence y-seq)
+        (format dat-file "~f ~f~%" x y))))
+
+  (when (and (not (null axis-list))
+	     (not (= (length y-seqs) (length axis-list))))
+    (error "sequence length mismatch detected between y-seqs and axis-list."))
+
+  (when (and (listp style) (not (= (length y-seqs) (length style))))
+    (error "list length mismatch detected between y-lists and style."))
   
   ;; Output to GP file
-  (dump-gp-file-append (comma-separated-concatenate
-			(loop for i from 0 to (1- (length y-lists))
-                              collect (format nil "\"~A.plot-id~A.~A\" using 1:2 with ~A title \"~A\""
-                                              *tmp-dat-file* plot-id i (string-downcase (symbol-name style))
-                                              (if (null title-list) " " (nth i title-list)))))
-		       :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
-		       :main main :output output :output-format output-format
-		       :x-logscale x-logscale :y-logscale y-logscale
-		       :x-range x-range :y-range y-range
-		       :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
-		       :key key))
+  (dump-gp-file-append
+   (comma-separated-concatenate
+    (loop for i from 0 below (length y-seqs)
+          collect (format nil "\"~A.plot-id~A.~A\" using 1:2 with ~A title \"~A\" axis ~A"
+                          *tmp-dat-file* plot-id i (string-downcase (symbol-name style))
+                          (if (null title-list) " " (nth i title-list))
+                          (if (null axis-list) "x1y1" (string-downcase (string (nth i axis-list)))))))
+   :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
+   :main main :output output :output-format output-format
+   :x-logscale x-logscale :y-logscale y-logscale
+   :x-range x-range :y-range y-range
+   :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
+   :key key))
 
-(defmacro multiplot ((&key layout) &body body)
+(defmacro multiplot ((&key layout output (output-format :png)) &body body)
   (assert (or (null layout)
               (and (listp layout)
                    (= (length layout) 2)
                    (every #'integerp layout))))
-  `(progn
-     (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
-       (format gp-file "set multiplot layout ~A,~A~%set format y \"%.3f\"~%"
-               ,(if layout (first layout) 1)
-               ,(if layout (second layout) (length body))))
-     (loop for plot-id from 0 to ,(1- (length body)) do
-       (cond ((eq (car (nth plot-id ',body)) 'plot)
-              (apply #'plot-list-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))
-             ((eq (car (nth plot-id ',body)) 'plots)
-              (apply #'plot-lists-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))))
-     (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :append)
-       (format gp-file "unset multiplot~%"))
-     (run)))
+  (let ((gp-file (gensym)))
+    `(progn
+       (with-open-file (,gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
+         (cond (,output
+	        (ecase ,output-format
+	          (:pdf (format ,gp-file "set term pdf~%"))
+	          (:eps (format ,gp-file "set term postscript eps enhanced color~%"))
+	          (:eps-monochrome (format ,gp-file "set term postscript eps enhanced monochrome~%"))
+                  (:png-400x320 (format ,gp-file "set term png size 400,320~%"))
+	          (:png (format ,gp-file "set term png~%"))
+                  (:png-640x480 (format ,gp-file "set term png~%"))
+	          (:png-1280x1024 (format ,gp-file "set term png size 1280,1024~%"))
+	          (:png-2560x1024 (format ,gp-file "set term png size 2560,1024~%"))
+	          (:png-monochrome (format ,gp-file "set term png monochrome~%")))
+	        (format ,gp-file "set output \"~A\"~%" ,output))
+	       (t (format ,gp-file "set term ~A~%" *default-terminal*)))
+         (format ,gp-file "set multiplot layout ~A,~A~%set format y \"%.3f\"~%"
+                 ,(if layout (first layout) 1)
+                 ,(if layout (second layout) (length body))))
+       (loop for plot-id from 0 to ,(1- (length body)) do
+         (cond ((eq (car (nth plot-id ',body)) 'plot)
+                (apply #'plot-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))
+               ((eq (car (nth plot-id ',body)) 'plots)
+                (apply #'plots-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))))
+       (with-open-file (,gp-file *tmp-gp-file* :direction :output :if-exists :append)
+         (format ,gp-file "unset multiplot~%"))
+       (run))))
 
 ;;; 3-dimension plot
 (defun dump-gp-file-3d

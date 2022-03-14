@@ -117,6 +117,21 @@ Paths to these files or command can be changed as below.
 
 *** Multiplot
 
+#+begin_src lisp
+(clgp:multiplot (:layout (2 2) :output "/tmp/multiplot.png" :output-format :png)
+  (clgp:plot (mapcar #'sin *x-list*) :style 'lines :key nil)
+  (clgp:plot (mapcar #'sin *x-list*) :style 'points :key nil)
+  (clgp:plot (mapcar #'sin *x-list*) :style 'impulses :key nil)
+  (clgp:plots (list (mapcar #'sin *x-list*)
+                    (mapcar #'cos *x-list*)
+                    (mapcar #'tan *x-list*))
+              :x-seqs  (list *x-list* *x-list* *x-list*)
+              :x-range (list (- pi) pi)
+              :y-range '(-1 1)
+              :key nil))
+#+end_src
+
+[[./docs/img/multiplot.png]]
 
 ** Author
 Satoshi Imai (satoshi.imai@gmail.com)

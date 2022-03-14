@@ -37,6 +37,15 @@ Paths to these files or command can be changed as below.
 
 [[./docs/img/clgp01.png]]
 
+Plots can be output to a file as follows.
+
+#+begin_src lisp
+(clgp:plot (mapcar #'sin *x-list*) :output "/path/to/file.png")
+(clgp:plot (mapcar #'sin *x-list*) :output "/path/to/file.png" :output-format :png)
+(clgp:plot (mapcar #'sin *x-list*) :output "/path/to/file.pdf" :output-format :pdf)
+(clgp:plot (mapcar #'sin *x-list*) :output "/path/to/file.eps" :output-format :eps)
+#+end_src
+
 *** Plot of multiple functions with annotations
 #+BEGIN_SRC lisp
 (clgp:plots (list (mapcar #'sin *x-list*)

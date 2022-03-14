@@ -1,8 +1,8 @@
 * clgplot 
-clgplot is a Gnuplot4 front-end on Common Lisp.
+clgplot is a Gnuplot front-end on Common Lisp.
 
 ** Dependencies
-Gnuplot4
+Gnuplot (>4)
 
 ** Installation
 #+BEGIN_SRC sh
@@ -28,7 +28,7 @@ Paths to these files or command can be changed as below.
 (defparameter clgp:*tmp-gp-file* "/tmp/clgplot-tmp.gp")
 #+END_SRC
 
-Plot of single function
+*** Plot of single function
 #+BEGIN_SRC lisp
 (defparameter *x-list* (loop for i from (- pi) to pi by 0.1 collect i))
 
@@ -37,7 +37,7 @@ Plot of single function
 
 [[./docs/img/clgp01.png]]
 
-Plot of multiple functions with annotations
+*** Plot of multiple functions with annotations
 #+BEGIN_SRC lisp
 (clgp:plots (list (mapcar #'sin *x-list*)
                   (mapcar #'cos *x-list*)
@@ -52,7 +52,18 @@ Plot of multiple functions with annotations
 
 [[./docs/img/clgp02.png]]
 
-3D plot examples
+#+begin_src lisp
+(let* ((rand-x-list (loop repeat 100 collect (- (random (* 2 pi)) pi)))
+       (rand-y-list (mapcar (lambda (x) (+ (sin x) (random-normal :sd 0.1d0))) rand-x-list)))
+  (clgp:plots (list (mapcar #'sin *x-list*)
+                    rand-y-list)
+              :x-seqs (list *x-list* rand-x-list)
+              :style '(line point)))
+#+end_src
+
+[[./docs/img/clgp02-2.png]]
+
+*** 3D plot examples
 #+BEGIN_SRC lisp
 (clgp:splot (lambda (x y) (+ (sin x) (cos y)))
   *x-list* ; x
@@ -71,7 +82,7 @@ Plot of multiple functions with annotations
 
 [[./docs/img/clgp04.png]]
 
-Plot matrix (2-dimensional array)
+*** Plot matrix (2-dimensional array)
 
 #+begin_src lisp
 (defparameter mat
@@ -86,7 +97,7 @@ Plot matrix (2-dimensional array)
 
 [[./docs/img/clgp05.png]]
 
-Histogram
+*** Histogram
 
 #+begin_src lisp
 (defun random-normal (&key (mean 0d0) (sd 1d0))
@@ -103,6 +114,8 @@ Histogram
 #+end_src
 
 [[./docs/img/clgp06.png]]
+
+*** Multiplot
 
 
 ** Author

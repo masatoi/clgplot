@@ -16,7 +16,8 @@
            #:plot-histogram-with-pdf
            #:splot-list
            #:splot
-           #:splot-matrix))
+           #:splot-matrix
+           #:multiplot))
 
 (in-package :clgplot)
 
@@ -345,7 +346,7 @@
                                  (x-logscale nil) (y-logscale nil)
                                  (x-range nil) (y-range nil)
                                  (x-range-reverse nil) (y-range-reverse nil) (key t))
-  (declare (ignore output output-format))
+  (declare (ignore output output-format key))
   (with-open-file (gp-file *tmp-gp-file* :direction :output
                                          :if-exists :append :if-does-not-exist :create)
 
@@ -434,10 +435,16 @@
 		       :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse
 		       :key key))
 
-(defmacro multiplot (&body body)
+(defmacro multiplot ((&key layout) &body body)
+  (assert (or (null layout)
+              (and (listp layout)
+                   (= (length layout) 2)
+                   (every #'integerp layout))))
   `(progn
      (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
-       (format gp-file "set multiplot layout ~A,1~%set format y \"%.3f\"~%" ,(length body)))
+       (format gp-file "set multiplot layout ~A,~A~%set format y \"%.3f\"~%"
+               ,(if layout (first layout) 1)
+               ,(if layout (second layout) (length body))))
      (loop for plot-id from 0 to ,(1- (length body)) do
        (cond ((eq (car (nth plot-id ',body)) 'plot)
               (apply #'plot-list-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))
@@ -460,6 +467,7 @@
      (view-point '(60 30)) (magnification 1) (z-scale 1)
      (palette 'jet)
      (key t) (map nil))
+  (declare (ignore key))
   (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
     ;; Output file format settings
     (cond (output

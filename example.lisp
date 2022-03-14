@@ -134,3 +134,13 @@
                     rand-y-list)
               :x-seqs (list *x-list* rand-x-list)
               :style '(line point)))
+
+(clgp:multiplot ()
+  (clgp:plot (mapcar #'sin *x-list*) :style 'lines)
+  (clgp:plot (mapcar #'sin *x-list*) :style 'points)
+  (clgp:plot (mapcar #'sin *x-list*) :style 'impulses))
+
+(clgp:multiplot (:layout (2 2))
+  (clgp:plot (mapcar #'sin *x-list*) :style 'lines)
+  (clgp:plot (mapcar #'sin *x-list*) :style 'points)
+  (clgp:plot (mapcar #'sin *x-list*) :style 'impulses))

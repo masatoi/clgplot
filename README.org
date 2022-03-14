@@ -35,7 +35,7 @@ Plot of single function
 (clgp:plot (mapcar #'sin *x-list*))
 #+END_SRC
 
-[[./docs/img/clgp02.png]]
+[[./docs/img/clgp01.png]]
 
 Plot of multiple functions with annotations
 #+BEGIN_SRC lisp
@@ -50,7 +50,7 @@ Plot of multiple functions with annotations
             :y-label "f(x)")
 #+END_SRC
 
-[[./docs/img/clgp-output2.png]]
+[[./docs/img/clgp02.png]]
 
 3D plot examples
 #+BEGIN_SRC lisp
@@ -60,7 +60,7 @@ Plot of multiple functions with annotations
   :view-point '(20 45) :z-scale 1.5)
 #+END_SRC
 
-[[./docs/img/clgp-splot1.png]]
+[[./docs/img/clgp03.png]]
 
 #+BEGIN_SRC lisp
 (clgp:splot (lambda (x y) (+ (sin x) (cos y)))
@@ -69,7 +69,41 @@ Plot of multiple functions with annotations
   :map t)
 #+END_SRC
 
-[[./docs/img/clgp09.png]]
+[[./docs/img/clgp04.png]]
+
+Plot matrix (2-dimensional array)
+
+#+begin_src lisp
+(defparameter mat
+  (make-array '(20 20)
+              :initial-contents
+              (loop for i from (- pi) to (- pi 0.1) by (/ pi 10) collect
+                (loop for j from (- pi) to (- pi 0.1) by (/ pi 10) collect
+                  (+ (sin i) (cos j))))))
+
+(clgp:splot-matrix mat)
+#+end_src
+
+[[./docs/img/clgp05.png]]
+
+Histogram
+
+#+begin_src lisp
+(defun random-normal (&key (mean 0d0) (sd 1d0))
+  (let ((alpha (random 1.0d0))
+	(beta  (random 1.0d0)))
+    (+ (* sd
+	  (sqrt (* -2 (log alpha)))
+	  (sin (* 2 pi beta)))
+       mean)))
+
+(clgp:plot-histogram (loop repeat 3000 collect (random-normal)) ; samples
+                     30 ; number of bin
+                     )
+#+end_src
+
+[[./docs/img/clgp06.png]]
+
 
 ** Author
 Satoshi Imai (satoshi.imai@gmail.com)

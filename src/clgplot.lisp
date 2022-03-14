@@ -115,6 +115,12 @@
                     :x-range x-range :y-range y-range
                     :x-range-reverse x-range-reverse :y-range-reverse y-range-reverse :key key)))
 
+(defun appropriate-style-p (style)
+  (and (symbolp style)
+       (member (symbol-name style)
+               '(lines line points point impulses impulse)
+               :key #'symbol-name :test #'equal)))
+
 (defun plot (y-seq
 	     &key (x-seq nil) (title " ") (style 'lines)
                   (x-label nil) (y-label nil)
@@ -124,6 +130,7 @@
                   (x-range nil) (y-range nil)
                   (x-range-reverse nil) (y-range-reverse nil) (key t)
                   (stream nil))
+  (assert (appropriate-style-p style))
   (when (null x-seq)
     (setf x-seq (loop for i from 0 below (length y-seq) collect i)))
   (unless (= (length x-seq) (length y-seq))
@@ -160,6 +167,7 @@
 	  (run)))))
 
 (defun comma-separated-concatenate (string-list)
+  (assert (every #'stringp string-list))
   (reduce (lambda (s1 s2) (concatenate 'string s1 "," s2))
           string-list))
 
@@ -175,6 +183,8 @@
                    ;; To use two axis: (plots (list list1 list2) :axis-list '(x1y1 x1y2))
                    (axis-list nil)
                    (stream nil))
+
+  (assert (or (appropriate-style-p style) (every #'appropriate-style-p style)))
   
   (when (null x-seqs)
     (setf x-seqs (make-list (length y-seqs))))
@@ -250,8 +260,8 @@
 ;;; histogram ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; Separate interval (a,b) equally to n bins, then return index of the bin which x belongs to.
 (defun histogram-lem1 (x a b n)
+  "Separate interval (a,b) equally to n bins, then return index of the bin which x belongs to."
   (if (or (< x a) (< b x))
       nil
       (if (= x b)
@@ -269,35 +279,29 @@
 	((> (car list) max) (search-min-max (cdr list) :min min :max (car list)))
 	(t (search-min-max (cdr list) :min min :max max))))
 
-;; サンプルのリストsamplesをrange幅で分割し,それぞれの区間での登場回数を数え上げる.
-;; 各区間のサンプル登場回数のリストを返す.
 (defun plot-histogram (samples n-of-bin &key (output nil)
                                              (x-range nil) (y-range nil)
                                              (x-logscale nil) (y-logscale nil))
+  "Divide samples by the range width equally and count the number of samples appear in each bins."
   (multiple-value-bind (a b)
       (search-min-max samples)
     (let ((counter (make-list n-of-bin :initial-element 0))
 	  (span (/ (- b a) n-of-bin)))
-      ;; 数え上げ
+      ;; Counting
       (dolist (x samples)
 	(let ((bin (histogram-lem1 x a b n-of-bin)))
 	  (if bin (incf (nth bin counter)))))
-      ;; datファイルに出力
+      ;; Output to DAT file
       (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
 	(loop for i from 0  to (1- n-of-bin) do
-                 (format dat-file "~f ~A~%"
-                         (/ (+ (+ a (* i span)) (+ a (* (1+ i) span))) 2.0)
-                         (nth i counter))))
-      ;; gpファイルに出力
+          (format dat-file "~f ~A~%"
+                  (/ (+ (+ a (* i span)) (+ a (* (1+ i) span))) 2.0)
+                  (nth i counter))))
+      ;; Output to GP file
       (dump-gp-file (format nil "\"~A\" using 1:2:(~f) with boxes fs solid 0.2 title \" \"" *tmp-dat-file* span)
 		    :output output :x-range x-range :y-range y-range :x-logscale x-logscale :y-logscale y-logscale)
-      ;; gnuplotを呼び出し
+      ;; Call Gnuplot
       (run))))
-
-(defun pdf-normal (x &key (mu 0) (sd 1))
-  (flet ((square (x) (* x x)))
-    (/ (exp (- (/ (square (/ (- x mu) sd)) 2)))
-       (* (sqrt (* 2 pi)) sd))))
 
 (defun plot-histogram-with-pdf (samples n-of-bin pdf &key (output nil)
                                                           (x-range nil) (y-range nil)
@@ -307,32 +311,32 @@
 	(search-min-max samples)
       (let ((counter (make-list n-of-bin :initial-element 0))
 	    (span (/ (- b a) n-of-bin)))
-	;; 数え上げ
+	;; Counting
 	(dolist (x samples)
 	  (let ((bin (histogram-lem1 x a b n-of-bin)))
 	    (if bin (incf (nth bin counter)))))
-	;; datファイルに出力
+	;; Output to DAT file
 	(with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
 	  (loop for i from 0  to (1- n-of-bin) do
-                   (format dat-file "~f ~f~%"
-                           (/ (+ (+ a (* i span)) (+ a (* (1+ i) span))) 2.0)
-                           ;;(nth i counter)
-                           (/ (nth i counter) (* span n-of-samples))
-                           )))
+            (format dat-file "~f ~f~%"
+                    (/ (+ (+ a (* i span)) (+ a (* (1+ i) span))) 2.0)
+                    ;;(nth i counter)
+                    (/ (nth i counter) (* span n-of-samples))
+                    )))
 	(with-open-file (dat-file (concatenate 'string *tmp-dat-file* ".pdfdat")
 				  :direction :output :if-exists :supersede)
 	  (loop for i from a to b by (/ (- b a) 100) do
-                   (format dat-file "~f ~f~%"
-                           i
-                           (funcall pdf i))))
-	;; gpファイルに出力
+            (format dat-file "~f ~f~%"
+                    i
+                    (funcall pdf i))))
+	;; Output to GP file
 	(dump-gp-file (format nil "\"~A\" using 1:2:(~f) with boxes fs solid 0.2 title \" \", \"~A\" using 1:2 with lines title \" \""
 			      *tmp-dat-file* span (concatenate 'string *tmp-dat-file* ".pdfdat"))
 		      :output output :x-range x-range :y-range y-range :x-logscale x-logscale :y-logscale y-logscale)
-	;; gnuplotを呼び出し
+	;; Call Gnuplot
 	(run)))))
 
-;;; multiplotのための関数群
+;;; functions for multiplot
 
 (defun dump-gp-file-append (plot-arg-format
 			    &key (x-label nil) (y-label nil)
@@ -346,11 +350,9 @@
                                          :if-exists :append :if-does-not-exist :create)
 
     (when main (format gp-file "set title \"~A\"~%" main))
-    ;; 軸のラベル
     (if x-label (format gp-file "set xlabel \"~A\"~%" x-label))
     (if y-label (format gp-file "set ylabel \"~A\"~%" y-label))
     
-    ;; 範囲指定、軸の向きの指定
     (if x-range
 	(format gp-file "set xrange [~f:~f] " (car x-range) (cadr x-range))
 	(format gp-file "set xrange [] "))
@@ -365,20 +367,13 @@
 	(format gp-file "reverse"))
     (format gp-file "~%")
     
-    ;; 対数スケール
     (if x-logscale (format gp-file "set logscale x~%"))
     (if y-logscale (format gp-file "set logscale y~%"))
     
-    ;; アスペクト比
     (if aspect-ratio (format gp-file "set size ratio ~f~%" aspect-ratio))
 
-    ;; 凡例の位置、あるいは出すかどうか
-    key
-    
-    ;; プロット用コマンド
     (format gp-file (concatenate 'string "plot " plot-arg-format "~%"))))
 
-;; nlisp-wrapper互換のgnuplot出力用ルーチン
 (defun plot-list-for-multiplot (plot-id y-list
 				&key (x-list nil) (title " ") (style 'lines)
                                      (x-label nil) (y-label nil)
@@ -388,14 +383,16 @@
                                      (x-range nil) (y-range nil)
                                      (x-range-reverse nil) (y-range-reverse nil) (key t))
   (if (null x-list) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
-  ;; 長さチェック
+
   (if (not (= (length x-list) (length y-list)))
       (error "list length mismatch detected between y-list and x-list."))
-  ;; datファイルに出力
+
+  ;; Output to DAT file
   (with-open-file (dat-file (format nil "~A.plot-id~A" *tmp-dat-file* plot-id)
 			    :direction :output :if-exists :supersede)
     (mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))
-  ;; gpファイルに出力
+
+  ;; Output to GP file
   (dump-gp-file-append (format nil "\"~A.plot-id~A\" using 1:2 with ~A title \"~A\""
 			       *tmp-dat-file* plot-id (string-downcase (symbol-name style)) title)
 		       :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
@@ -414,23 +411,22 @@
                                       (x-range nil) (y-range nil)
                                       (x-range-reverse nil) (y-range-reverse nil) (key t))
   (loop for i from 0 to (1- (length y-lists)) do
-           (let ((x-list (nth i x-lists))
-                 (y-list (nth i y-lists)))
-             (if (null x-lists) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
-             ;; 長さチェック
-             (if (not (= (length x-list) (length y-list)))
-                 (error "list length mismatch detected between y-list and x-list."))
-             ;; datファイルに出力
-             (with-open-file (dat-file (format nil "~A.plot-id~A.~A" *tmp-dat-file* plot-id i)
-                                       :direction :output :if-exists :supersede)
-               (mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))))
+    (let ((x-list (nth i x-lists))
+          (y-list (nth i y-lists)))
+      (if (null x-lists) (setf x-list (loop for i from 0 to (1- (length y-list)) collect i)))
+      (if (not (= (length x-list) (length y-list)))
+          (error "list length mismatch detected between y-list and x-list."))
+      ;; Output to DAT file
+      (with-open-file (dat-file (format nil "~A.plot-id~A.~A" *tmp-dat-file* plot-id i)
+                                :direction :output :if-exists :supersede)
+        (mapc #'(lambda (x y) (format dat-file "~f ~f~%" x y)) x-list y-list))))
   
-  ;; gpファイルに出力
+  ;; Output to GP file
   (dump-gp-file-append (comma-separated-concatenate
-			(loop for i from 0 to (1- (length y-lists)) collect
-                                 (format nil "\"~A.plot-id~A.~A\" using 1:2 with ~A title \"~A\""
-                                         *tmp-dat-file* plot-id i (string-downcase (symbol-name style))
-                                         (if (null title-list) " " (nth i title-list)))))
+			(loop for i from 0 to (1- (length y-lists))
+                              collect (format nil "\"~A.plot-id~A.~A\" using 1:2 with ~A title \"~A\""
+                                              *tmp-dat-file* plot-id i (string-downcase (symbol-name style))
+                                              (if (null title-list) " " (nth i title-list)))))
 		       :x-label x-label :y-label y-label :aspect-ratio aspect-ratio
 		       :main main :output output :output-format output-format
 		       :x-logscale x-logscale :y-logscale y-logscale
@@ -443,13 +439,12 @@
      (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
        (format gp-file "set multiplot layout ~A,1~%set format y \"%.3f\"~%" ,(length body)))
      (loop for plot-id from 0 to ,(1- (length body)) do
-              (cond ((eq (car (nth plot-id ',body)) 'plot)
-                     (apply #'plot-list-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))
-                    ((eq (car (nth plot-id ',body)) 'plots)
-                     (apply #'plot-lists-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))))
+       (cond ((eq (car (nth plot-id ',body)) 'plot)
+              (apply #'plot-list-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))
+             ((eq (car (nth plot-id ',body)) 'plots)
+              (apply #'plot-lists-for-multiplot (cons plot-id (mapcar #'eval (cdr (nth plot-id ',body))))))))
      (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :append)
        (format gp-file "unset multiplot~%"))
-     ;; gnuplotを呼び出し
      (run)))
 
 ;;; 3-dimension plot
@@ -466,8 +461,7 @@
      (palette 'jet)
      (key t) (map nil))
   (with-open-file (gp-file *tmp-gp-file* :direction :output :if-exists :supersede)
-    ;; 図の設定
-    ;; 画像出力する場合の設定
+    ;; Output file format settings
     (cond (output
 	   (ecase output-format
 	     (:pdf (format gp-file "set term pdf~%"))
@@ -483,12 +477,12 @@
 	  (t (format gp-file "set term ~A~%" *default-terminal*)))
 
     (when main (format gp-file "set title \"~A\"~%" main))
-    ;; 軸のラベル
+    ;; Label of axis
     (if x-label (format gp-file "set xlabel \"~A\"~%" x-label))
     (if y-label (format gp-file "set ylabel \"~A\"~%" y-label))
     (if z-label (format gp-file "set zlabel \"~A\"~%" z-label))
     
-    ;; 範囲指定、軸の向きの指定
+    ;; Specify range and axis orientation
     (if x-range
 	(format gp-file "set xrange [~f:~f] " (car x-range) (cadr x-range))
 	(format gp-file "set xrange [] "))
@@ -510,22 +504,19 @@
 	(format gp-file "reverse"))
     (format gp-file "~%")
     
-    ;; 対数スケール
+    ;; Log scale
     (if x-logscale (format gp-file "set logscale x~%"))
     (if y-logscale (format gp-file "set logscale y~%"))
     (if z-logscale (format gp-file "set logscale z~%"))
     
-    ;; アスペクト比
+    ;; Aspect ratio
     (if aspect-ratio (format gp-file "set size ratio ~f~%" aspect-ratio))
 
-    ;; 視点指定
+    ;; View point
     (format gp-file "set view ~A, ~A, ~A, ~A~%"
             (car view-point) (cadr view-point) magnification z-scale)
-    
-    ;; 凡例の位置、あるいは出すかどうか
-    key
-    
-    ;; カラースキーム指定
+
+    ;; Color scheme
     (ecase palette
       (:greys (format gp-file "set palette defined ( 0 0 0 0, 1 1 1 1 )~%"))
       (:greys-invert (format gp-file "set palette defined ( 1 1 1 1, 0 0 0 0 )~%"))
@@ -539,7 +530,6 @@
 	  (format gp-file "set ticslevel 0~%")
 	  (format gp-file "set pm3d~%")))
 
-    ;; プロット用コマンド
     (format gp-file (concatenate 'string "splot " plot-arg-format))))
 
 (defun splot-list (z-func x-list y-list
@@ -552,13 +542,14 @@
                         (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
                         (view-point '(60 30)) (magnification 1) (z-scale 1)
                         (palette :jet) (key t) (map nil))
+
   ;; Output to DAT file
   (with-open-file (dat-file *tmp-dat-file* :direction :output :if-exists :supersede)
     (mapc #'(lambda (x)
               (mapc #'(lambda (y)
                         (format dat-file "~f ~f ~f~%" x y (funcall z-func x y)))
                     y-list)
-              (format dat-file "~%")) ; xの値が変わるごとに改行を入れることでグリッドデータとして認識される
+              (format dat-file "~%")) ; Put a new line every time the value of x changes, so that gnuplot recognizes it as grid data.
           x-list))
   ;; Output to DAT file
   (dump-gp-file-3d
@@ -593,6 +584,9 @@
                    (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
                    (view-point '(60 30)) (magnification 1) (z-scale 1)
                    (palette :jet) (key t) (map nil))
+
+  (assert (appropriate-style-p style))
+  
   (splot-list z-func (coerce x-seq 'list) (coerce y-seq 'list)
               :title title :style style
               :x-label x-label :y-label y-label :z-label z-label
@@ -609,6 +603,9 @@
                                  (output nil) (output-format :png)
                                  (x-range-reverse nil) (y-range-reverse nil) (z-range-reverse nil)
                                  (palette :jet) (key t))
+
+  (assert (appropriate-style-p style))
+
   (flet ((seq-row (start end)
 	   (nlet iteration ((i start) (product nil))
 	     (if (> i end)

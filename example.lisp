@@ -1,5 +1,7 @@
 ;;; -*- coding:utf-8; mode:lisp -*-
 
+(ql:quickload :clgplot)
+
 ;; Plot line
 (clgp:plot '(1 2 3))
 
@@ -110,17 +112,24 @@
                      30 ; number of bin
                      )
 
-;; Style
-(defparameter *x-list2*
-  '(-3.14 -2.64 -2.14 -1.64 -1.14 -0.64 -0.14 0.358 0.858 1.358 1.858 2.358 2.858 3.14))
+;; Plot samples with probability density function
+(defun pdf-normal (x &key (mu 0) (sd 1))
+  (flet ((square (x) (* x x)))
+    (/ (exp (- (/ (square (/ (- x mu) sd)) 2)))
+       (* (sqrt (* 2 pi)) sd))))
 
-(clgp:plot (mapcar #'sin *x-list2*) :style 'line)
-(clgp:plot (mapcar #'sin *x-list2*) :style 'points)
-(clgp:plot (mapcar #'sin *x-list2*) :style 'impulse)
+(clgp:plot-histogram-with-pdf (loop repeat 3000 collect (random-normal)) ; samples
+                              30 ; number of bin
+                              #'pdf-normal)
+
+;; Style
+(clgp:plot (mapcar #'sin *x-list*) :style 'lines)
+(clgp:plot (mapcar #'sin *x-list*) :style 'points)
+(clgp:plot (mapcar #'sin *x-list*) :style 'impulses)
 
 ;; Multiple styles
 (let* ((rand-x-list (loop repeat 100 collect (- (random (* 2 pi)) pi)))
-       (rand-y-list (mapcar (lambda (x) (+ (sin x) (random-normal :sd 0.2d0))) rand-x-list)))
+       (rand-y-list (mapcar (lambda (x) (+ (sin x) (random-normal :sd 0.1d0))) rand-x-list)))
   (clgp:plots (list (mapcar #'sin *x-list*)
                     rand-y-list)
               :x-seqs (list *x-list* rand-x-list)

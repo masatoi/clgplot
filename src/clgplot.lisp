@@ -573,7 +573,11 @@
 	  (format gp-file "set ticslevel 0~%")
 	  (format gp-file "set pm3d~%")))
 
-    (format gp-file (concatenate 'string "splot " plot-arg-format))))
+    (format gp-file (concatenate 'string "splot " plot-arg-format))
+
+    (when (and (null output)
+               (member *default-terminal* '("x11" "qt") :test #'equal))
+      (format gp-file "~%pause mouse close~%"))))
 
 (defun splot-list (z-func x-list y-list
 		   &key (title " ") (style 'lines)

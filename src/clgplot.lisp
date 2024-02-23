@@ -89,8 +89,14 @@
       (format stream "reverse"))
   (format stream "~%")
   ;; Use of logscale
-  (if x-logscale (format stream "set logscale x~%"))
-  (if y-logscale (format stream "set logscale y~%"))
+  (if x-logscale
+      (if (and (integerp x-logscale) (> x-logscale 0))
+          (format stream "set logscale x ~A~%" x-logscale)
+          (format stream "set logscale x~%")))
+  (if y-logscale
+      (if (and (integerp y-logscale) (> y-logscale 0))
+          (format stream "set logscale y ~A~%" y-logscale)
+          (format stream "set logscale y~%")))
   ;; Aspect ratio
   (if aspect-ratio (format stream "set size ratio ~f~%" aspect-ratio))
   ;; Graph legend enable/disable, or its position
